@@ -1,0 +1,3351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChemPredict — Chemical Reaction Product Trainer</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    /* Custom subtle animations for feedback and transitions */
+    @keyframes fadeSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .animate-fade-in {
+      animation: fadeSlideIn 0.25s ease-out forwards;
+    }
+    /* Smooth focus ring and tap highlight removal on mobile */
+    button, input {
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased selection:bg-indigo-100 selection:text-indigo-900">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <!-- Brand Logo & Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm shadow-indigo-200">
+          <!-- Flask SVG Icon -->
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 3h6m-5 0v5.172a2 2 0 01-.586 1.414l-4.828 4.828A2 2 0 004 15.828V18a3 3 0 003 3h10a3 3 0 003-3v-2.172a2 2 0 00-.586-1.414l-4.828-4.828A2 2 0 0114 8.172V3" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">ChemPredict</h1>
+          <p class="text-xs text-slate-500 hidden sm:block">Interactive Reaction Product Practice</p>
+        </div>
+      </div>
+
+      <!-- Live Stats & Reference Button -->
+      <div class="flex items-center gap-2 sm:gap-4">
+        <div class="flex items-center gap-3 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200/80 text-xs sm:text-sm">
+          <div class="flex items-center gap-1.5" title="Current Streak">
+            <span class="text-amber-500 font-bold">🔥</span>
+            <span class="font-semibold text-slate-700" id="stat-streak">0</span>
+          </div>
+          <span class="text-slate-300">|</span>
+          <div class="flex items-center gap-1.5" title="Score">
+            <span class="text-emerald-600 font-bold">✓</span>
+            <span class="font-semibold text-slate-700"><span id="stat-correct">0</span>/<span id="stat-total">0</span></span>
+          </div>
+        </div>
+
+        <button
+          id="btn-toggle-ref"
+          type="button"
+          class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/70 transition cursor-pointer"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+          <span>Reference Sheet</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+
+    <!-- Control Bar: Reaction Type Selection -->
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-4">
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Reaction Types</span>
+          <button
+            id="btn-select-all"
+            type="button"
+            class="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition cursor-pointer"
+          >
+            Select All
+          </button>
+        </div>
+        <div class="flex flex-wrap gap-2" id="reaction-filters">
+          <button
+            type="button"
+            data-type="double"
+            aria-pressed="true"
+            class="filter-pill px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-2 cursor-pointer bg-indigo-600 text-white border-indigo-600 shadow-sm"
+          >
+            <span class="pill-check">✓</span>
+            <span>Double Displacement</span>
+          </button>
+
+          <button
+            type="button"
+            data-type="single"
+            aria-pressed="true"
+            class="filter-pill px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-2 cursor-pointer bg-indigo-600 text-white border-indigo-600 shadow-sm"
+          >
+            <span class="pill-check">✓</span>
+            <span>Single Displacement</span>
+          </button>
+
+          <button
+            type="button"
+            data-type="combustion"
+            aria-pressed="true"
+            class="filter-pill px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-2 cursor-pointer bg-indigo-600 text-white border-indigo-600 shadow-sm"
+          >
+            <span class="pill-check">✓</span>
+            <span>Combustion</span>
+          </button>
+
+          <button
+            type="button"
+            data-type="decomp_carbonate"
+            aria-pressed="true"
+            class="filter-pill px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-2 cursor-pointer bg-indigo-600 text-white border-indigo-600 shadow-sm"
+          >
+            <span class="pill-check">✓</span>
+            <span>Carbonate Decomposition</span>
+          </button>
+
+          <button
+            type="button"
+            data-type="synth_oxide_water"
+            aria-pressed="true"
+            class="filter-pill px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-2 cursor-pointer bg-indigo-600 text-white border-indigo-600 shadow-sm"
+          >
+            <span class="pill-check">✓</span>
+            <span>Synthesis (Metal Oxide + H₂O)</span>
+          </button>
+
+          <button
+            type="button"
+            data-type="decomp_binary"
+            aria-pressed="true"
+            class="filter-pill px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-2 cursor-pointer bg-indigo-600 text-white border-indigo-600 shadow-sm"
+          >
+            <span class="pill-check">✓</span>
+            <span>Binary Decomposition</span>
+          </button>
+
+          <button
+            type="button"
+            data-type="synth_binary_ionic"
+            aria-pressed="true"
+            class="filter-pill px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-2 cursor-pointer bg-indigo-600 text-white border-indigo-600 shadow-sm"
+          >
+            <span class="pill-check">✓</span>
+            <span>Synthesis (Metal + Nonmetal)</span>
+          </button>
+
+          <button
+            type="button"
+            data-type="synth_nonmetal_oxide_water"
+            aria-pressed="true"
+            class="filter-pill px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-2 cursor-pointer bg-indigo-600 text-white border-indigo-600 shadow-sm"
+          >
+            <span class="pill-check">✓</span>
+            <span>Synthesis (Nonmetal Oxide + H₂O)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Inline Notification Banner for Filter Edge Case -->
+      <p id="filter-notice" class="hidden text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+        At least one reaction type must remain selected.
+      </p>
+    </section>
+
+    <!-- Main Reaction Problem Card -->
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <!-- Card Top Status Header -->
+      <div class="bg-slate-50/80 border-b border-slate-200 px-5 sm:px-7 py-3.5 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5">
+          <!-- Reaction Type Badge -->
+          <span id="badge-reaction-type" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase bg-purple-100 text-purple-800 border border-purple-200">
+            Double Displacement
+          </span>
+          <!-- Prompt Format Badge -->
+          <span id="badge-prompt-format" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 border border-sky-200">
+            <span id="format-icon">⚗️</span>
+            <span id="format-label">Symbol Prompt</span>
+          </span>
+        </div>
+
+        <button
+          id="btn-skip"
+          type="button"
+          class="text-xs sm:text-sm font-medium text-slate-500 hover:text-indigo-600 transition flex items-center gap-1 cursor-pointer py-1 px-2 rounded-lg hover:bg-slate-100"
+        >
+          <span>New Question</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Interactive Chemical Equation Workspace -->
+      <div class="p-5 sm:p-8 space-y-6">
+        <div class="text-center sm:text-left space-y-1">
+          <h2 id="instruction-title" class="text-base sm:text-lg font-bold text-slate-900">Predict the two products of this reaction:</h2>
+          <p id="instruction-subtitle" class="text-xs sm:text-sm text-slate-500">
+            Enter the chemical formulas for both products (order does not matter).
+          </p>
+        </div>
+
+        <!-- Single-Line Equation Display & Inputs -->
+        <div class="bg-slate-50 rounded-2xl border border-slate-200/90 p-3.5 sm:p-5">
+          <div class="flex flex-row flex-nowrap items-center justify-between gap-1.5 sm:gap-2.5 overflow-x-auto pb-1 sm:pb-0">
+            
+            <!-- Reactant 1 -->
+            <div id="reactant-1" class="flex-1 min-w-[95px] sm:min-w-[115px] px-2.5 sm:px-3.5 py-2.5 sm:py-3 rounded-xl bg-white border border-slate-200 shadow-xs text-center font-bold text-slate-900 text-sm sm:text-base whitespace-nowrap">
+              AgNO₃
+            </div>
+
+            <span id="reactant-plus" class="text-base sm:text-lg font-bold text-slate-400 select-none shrink-0">+</span>
+
+            <!-- Reactant 2 -->
+            <div id="reactant-2" class="flex-1 min-w-[95px] sm:min-w-[115px] px-2.5 sm:px-3.5 py-2.5 sm:py-3 rounded-xl bg-white border border-slate-200 shadow-xs text-center font-bold text-slate-900 text-sm sm:text-base whitespace-nowrap">
+              NaCl
+            </div>
+
+            <!-- Yield Arrow -->
+            <div class="flex items-center justify-center px-0.5 sm:px-1.5 text-indigo-600 select-none shrink-0" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </div>
+
+            <!-- Product 1 Input -->
+            <div id="product-1-wrapper" class="flex-1 min-w-[110px] sm:min-w-[130px] relative">
+              <label for="input-product-1" class="sr-only">First Product</label>
+              <input
+                id="input-product-1"
+                type="text"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+                placeholder="Product 1"
+                class="product-input w-full px-2.5 sm:px-3.5 py-2.5 sm:py-3 rounded-xl bg-white border-2 border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none text-center font-semibold text-sm sm:text-base text-slate-900 placeholder:text-slate-400 transition"
+              />
+              <span id="status-icon-1" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-base"></span>
+            </div>
+
+            <span id="product-plus" class="text-base sm:text-lg font-bold text-slate-400 select-none shrink-0">+</span>
+
+            <!-- Product 2 Input -->
+            <div id="product-2-wrapper" class="flex-1 min-w-[110px] sm:min-w-[130px] relative">
+              <label for="input-product-2" class="sr-only">Second Product</label>
+              <input
+                id="input-product-2"
+                type="text"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+                placeholder="Product 2"
+                class="product-input w-full px-2.5 sm:px-3.5 py-2.5 sm:py-3 rounded-xl bg-white border-2 border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none text-center font-semibold text-sm sm:text-base text-slate-900 placeholder:text-slate-400 transition"
+              />
+              <span id="status-icon-2" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-base"></span>
+            </div>
+
+          </div>
+
+          <!-- Subscript Quick-Insert Toolbar (Shown in Symbol Mode) -->
+          <div id="subscript-toolbar" class="mt-4 pt-3 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
+            <span class="text-xs text-slate-500">
+              Tip: Plain numbers like <code class="font-mono bg-slate-200/70 px-1.5 py-0.5 rounded text-slate-700">H2O</code> work automatically, or insert subscripts:
+            </span>
+            <div class="flex items-center gap-1.5">
+              <button type="button" data-char="₂" class="char-btn px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-indigo-50 hover:border-indigo-300 font-mono text-sm font-bold text-slate-700 shadow-2xs transition cursor-pointer">₂</button>
+              <button type="button" data-char="₃" class="char-btn px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-indigo-50 hover:border-indigo-300 font-mono text-sm font-bold text-slate-700 shadow-2xs transition cursor-pointer">₃</button>
+              <button type="button" data-char="₄" class="char-btn px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-indigo-50 hover:border-indigo-300 font-mono text-sm font-bold text-slate-700 shadow-2xs transition cursor-pointer">₄</button>
+              <button type="button" data-char="(" class="char-btn px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-indigo-50 hover:border-indigo-300 font-mono text-sm font-bold text-slate-700 shadow-2xs transition cursor-pointer">(</button>
+              <button type="button" data-char=")" class="char-btn px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-indigo-50 hover:border-indigo-300 font-mono text-sm font-bold text-slate-700 shadow-2xs transition cursor-pointer">)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Primary Action Buttons -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
+          <button
+            id="btn-reveal"
+            type="button"
+            class="px-5 py-3 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 transition cursor-pointer order-2 sm:order-1"
+          >
+            Show Answer
+          </button>
+
+          <button
+            id="btn-check"
+            type="button"
+            class="px-6 py-3 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] shadow-sm shadow-indigo-200 transition cursor-pointer order-1 sm:order-2 flex items-center justify-center gap-2"
+          >
+            <span>Check Products</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </button>
+
+          <button
+            id="btn-next"
+            type="button"
+            class="hidden px-6 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] shadow-sm shadow-emerald-200 transition cursor-pointer order-1 sm:order-2 flex items-center justify-center gap-2"
+          >
+            <span>Next Reaction</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Diagnostic Feedback Panel -->
+        <div id="feedback-box" class="hidden rounded-2xl border p-4 sm:p-5 animate-fade-in space-y-3" role="alert">
+          <div class="flex items-start gap-3">
+            <div id="feedback-icon" class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-base font-bold mt-0.5">
+              !
+            </div>
+            <div class="space-y-1.5 flex-1">
+              <h3 id="feedback-title" class="font-bold text-sm sm:text-base">Feedback Title</h3>
+              <div id="feedback-message" class="text-xs sm:text-sm leading-relaxed space-y-1.5"></div>
+            </div>
+          </div>
+
+          <!-- Full Balanced Equation & Conceptual Explanation Box -->
+          <div id="solution-details" class="hidden pt-3 border-t border-current/15 space-y-2 text-xs sm:text-sm">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="font-semibold uppercase tracking-wider text-[11px] opacity-75">Balanced Equation:</span>
+              <span id="balanced-equation-text" class="font-mono font-bold px-2.5 py-1 rounded-lg bg-white/80 text-slate-900 border border-black/10"></span>
+            </div>
+            <p id="explanation-text" class="opacity-95 leading-relaxed"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Collapsible Quick Reference Sheet -->
+    <section id="reference-panel" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 space-y-4 animate-fade-in">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">Reaction Prediction Reference Guide</h2>
+          <p class="text-xs text-slate-500">Diatomic elements: H₂, N₂, O₂, F₂, Cl₂, Br₂, I₂ • Common polyatomic ions: NO₃⁻, OH⁻, SO₄²⁻, CO₃²⁻, PO₄³⁻</p>
+        </div>
+        <button
+          id="btn-close-ref"
+          type="button"
+          class="text-xs font-semibold text-slate-500 hover:text-slate-800 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+        >
+          Close ✕
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs sm:text-sm">
+        <!-- Pattern 1 -->
+        <div class="p-4 rounded-xl bg-purple-50/70 border border-purple-100 space-y-1.5">
+          <div class="font-bold text-purple-900">1. Double Displacement</div>
+          <div class="font-mono text-xs font-semibold text-purple-700 bg-white px-2 py-1 rounded border border-purple-200/70">AB + CD → AD + CB</div>
+          <p class="text-slate-600 text-xs leading-relaxed">
+            Positive ions (cations) swap negative ions (anions). Balance charges using the criss-cross method. Acid + Base always forms a Salt + Water (H₂O).
+          </p>
+        </div>
+
+        <!-- Pattern 2 -->
+        <div class="p-4 rounded-xl bg-amber-50/70 border border-amber-100 space-y-1.5">
+          <div class="font-bold text-amber-900">2. Single Displacement</div>
+          <div class="font-mono text-xs font-semibold text-amber-700 bg-white px-2 py-1 rounded border border-amber-200/70">A + BC → AC + B</div>
+          <p class="text-slate-600 text-xs leading-relaxed">
+            A reactive metal replaces the cation (or hydrogen in acids/water). A reactive halogen replaces the halide anion. Watch out for diatomic elements!
+          </p>
+        </div>
+
+        <!-- Pattern 3 -->
+        <div class="p-4 rounded-xl bg-rose-50/70 border border-rose-100 space-y-1.5">
+          <div class="font-bold text-rose-900">3. Complete Combustion</div>
+          <div class="font-mono text-xs font-semibold text-rose-700 bg-white px-2 py-1 rounded border border-rose-200/70">CₓHᵧ + O₂ → CO₂ + H₂O</div>
+          <p class="text-slate-600 text-xs leading-relaxed">
+            Any hydrocarbon or alcohol reacting completely with oxygen (O₂) always produces <strong>carbon dioxide (CO₂)</strong> and <strong>water (H₂O)</strong>.
+          </p>
+        </div>
+
+        <!-- Pattern 4 -->
+        <div class="p-4 rounded-xl bg-teal-50/70 border border-teal-100 space-y-1.5">
+          <div class="font-bold text-teal-900">4. Carbonate Decomposition</div>
+          <div class="font-mono text-xs font-semibold text-teal-700 bg-white px-2 py-1 rounded border border-teal-200/70">MCO₃ → MO + CO₂</div>
+          <p class="text-slate-600 text-xs leading-relaxed">
+            When heated, a metal carbonate breaks down into a <strong>metal oxide</strong> (charge-balanced with O²⁻) and <strong>carbon dioxide gas (CO₂)</strong>.
+          </p>
+        </div>
+
+        <!-- Pattern 5 -->
+        <div class="p-4 rounded-xl bg-blue-50/70 border border-blue-100 space-y-1.5">
+          <div class="font-bold text-blue-900">5. Metal Oxide + Water Synthesis</div>
+          <div class="font-mono text-xs font-semibold text-blue-700 bg-white px-2 py-1 rounded border border-blue-200/70">MO + H₂O → M(OH)ₓ</div>
+          <p class="text-slate-600 text-xs leading-relaxed">
+            A metal oxide reacts with water to synthesize a single basic product: a <strong>metal hydroxide</strong> (balance the metal cation with OH⁻).
+          </p>
+        </div>
+
+        <!-- Pattern 6 -->
+        <div class="p-4 rounded-xl bg-orange-50/70 border border-orange-100 space-y-1.5">
+          <div class="font-bold text-orange-900">6. Binary Compound Decomposition</div>
+          <div class="font-mono text-xs font-semibold text-orange-700 bg-white px-2 py-1 rounded border border-orange-200/70">AB → A + B</div>
+          <p class="text-slate-600 text-xs leading-relaxed">
+            A binary compound (made of two elements) breaks down into its <strong>two pure elements</strong>. Remember to apply subscript 2 to any of the 7 diatomic elements!
+          </p>
+        </div>
+
+        <!-- Pattern 7 -->
+        <div class="p-4 rounded-xl bg-emerald-50/70 border border-emerald-100 space-y-1.5">
+          <div class="font-bold text-emerald-900">7. Binary Ionic Synthesis</div>
+          <div class="font-mono text-xs font-semibold text-emerald-700 bg-white px-2 py-1 rounded border border-emerald-200/70">M + X → MₐXᵦ</div>
+          <p class="text-slate-600 text-xs leading-relaxed">
+            A metallic element and a nonmetallic element combine into a single <strong>binary ionic compound</strong>. Criss-cross cation and anion charges—do not copy diatomic subscripts!
+          </p>
+        </div>
+
+        <!-- Pattern 8 -->
+        <div class="p-4 rounded-xl bg-cyan-50/70 border border-cyan-100 space-y-1.5">
+          <div class="font-bold text-cyan-900">8. Nonmetal Oxide + Water Synthesis</div>
+          <div class="font-mono text-xs font-semibold text-cyan-700 bg-white px-2 py-1 rounded border border-cyan-200/70">XO + H₂O → HₐXOᵦ</div>
+          <p class="text-slate-600 text-xs leading-relaxed">
+            A nonmetal oxide (acid anhydride) reacts with water to synthesize a single acidic product: an <strong>oxyacid</strong> (keep the nonmetal's oxidation state unchanged).
+          </p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="max-w-5xl w-full mx-auto px-4 sm:px-6 py-4 text-center text-xs text-slate-400">
+    ChemPredict • Practice predicting products in word and symbolic form
+  </footer>
+
+  <!-- Application Logic -->
+  <script>
+    /**
+     * Comprehensive Chemistry Reaction Dataset
+     * 20 Double Displacement, 20 Single Displacement, and 7 of each other type (82 total).
+     */
+    const REACTIONS = [
+      // ==================== DOUBLE DISPLACEMENT (20) ====================
+      {
+        id: 'dd_1',
+        type: 'double',
+        reactants: [
+          { symbol: 'AgNO₃', word: 'Silver nitrate' },
+          { symbol: 'NaCl', word: 'Sodium chloride' }
+        ],
+        products: [
+          {
+            symbol: 'AgCl',
+            acceptedSymbols: ['AgCl'],
+            word: 'Silver chloride',
+            acceptedWords: ['silver chloride', 'silver(i) chloride'],
+            ionHint: 'Ag⁺ and Cl⁻ combine in a 1:1 ratio to form AgCl.'
+          },
+          {
+            symbol: 'NaNO₃',
+            acceptedSymbols: ['NaNO3'],
+            word: 'Sodium nitrate',
+            acceptedWords: ['sodium nitrate'],
+            ionHint: 'Na⁺ and NO₃⁻ combine in a 1:1 ratio to form NaNO₃.'
+          }
+        ],
+        balancedEquation: 'AgNO₃ + NaCl → AgCl(s) + NaNO₃',
+        explanation: 'The cations Ag⁺ and Na⁺ switch anions (NO₃⁻ and Cl⁻). Because all ions have +1 or -1 charges, no extra subscripts are needed.'
+      },
+      {
+        id: 'dd_2',
+        type: 'double',
+        reactants: [
+          { symbol: 'Pb(NO₃)₂', word: 'Lead(II) nitrate' },
+          { symbol: 'KI', word: 'Potassium iodide' }
+        ],
+        products: [
+          {
+            symbol: 'PbI₂',
+            acceptedSymbols: ['PbI2'],
+            word: 'Lead(II) iodide',
+            acceptedWords: ['lead(ii) iodide', 'lead (ii) iodide'],
+            ionHint: 'Lead(II) has a +2 charge (Pb²⁺) and iodide is I⁻, requiring two iodides: PbI₂.'
+          },
+          {
+            symbol: 'KNO₃',
+            acceptedSymbols: ['KNO3'],
+            word: 'Potassium nitrate',
+            acceptedWords: ['potassium nitrate'],
+            ionHint: 'K⁺ and NO₃⁻ combine in a 1:1 ratio to form KNO₃.'
+          }
+        ],
+        balancedEquation: 'Pb(NO₃)₂ + 2 KI → PbI₂(s) + 2 KNO₃',
+        explanation: 'Pb²⁺ pairs with I⁻ to form yellow lead(II) iodide precipitate (PbI₂), while K⁺ pairs with NO₃⁻ to form potassium nitrate (KNO₃).'
+      },
+      {
+        id: 'dd_3',
+        type: 'double',
+        reactants: [
+          { symbol: 'BaCl₂', word: 'Barium chloride' },
+          { symbol: 'Na₂SO₄', word: 'Sodium sulfate' }
+        ],
+        products: [
+          {
+            symbol: 'BaSO₄',
+            acceptedSymbols: ['BaSO4'],
+            word: 'Barium sulfate',
+            acceptedWords: ['barium sulfate', 'barium sulphate'],
+            ionHint: 'Ba²⁺ (+2) and SO₄²⁻ (-2) balance each other in a 1:1 ratio: BaSO₄.'
+          },
+          {
+            symbol: 'NaCl',
+            acceptedSymbols: ['NaCl'],
+            word: 'Sodium chloride',
+            acceptedWords: ['sodium chloride'],
+            ionHint: 'Na⁺ (+1) and Cl⁻ (-1) combine in a 1:1 ratio: NaCl (the subscript 2 in Na₂SO₄ does not carry over!).'
+          }
+        ],
+        balancedEquation: 'BaCl₂ + Na₂SO₄ → BaSO₄(s) + 2 NaCl',
+        explanation: 'Ba²⁺ pairs with SO₄²⁻ to form insoluble barium sulfate (BaSO₄), and Na⁺ pairs with Cl⁻ to form sodium chloride (NaCl).'
+      },
+      {
+        id: 'dd_4',
+        type: 'double',
+        reactants: [
+          { symbol: 'HCl', word: 'Hydrochloric acid' },
+          { symbol: 'NaOH', word: 'Sodium hydroxide' }
+        ],
+        products: [
+          {
+            symbol: 'NaCl',
+            acceptedSymbols: ['NaCl'],
+            word: 'Sodium chloride',
+            acceptedWords: ['sodium chloride'],
+            ionHint: 'The cation Na⁺ from the base pairs with the anion Cl⁻ from the acid to form NaCl.'
+          },
+          {
+            symbol: 'H₂O',
+            acceptedSymbols: ['H2O', 'HOH'],
+            word: 'Water',
+            acceptedWords: ['water', 'dihydrogen monoxide'],
+            ionHint: 'H⁺ and OH⁻ combine to form water (H₂O).'
+          }
+        ],
+        balancedEquation: 'HCl + NaOH → NaCl + H₂O',
+        explanation: 'This is an acid-base neutralization (a subtype of double displacement): H⁺ + OH⁻ forms water (H₂O), and Na⁺ + Cl⁻ forms table salt (NaCl).'
+      },
+      {
+        id: 'dd_5',
+        type: 'double',
+        reactants: [
+          { symbol: 'H₂SO₄', word: 'Sulfuric acid' },
+          { symbol: 'KOH', word: 'Potassium hydroxide' }
+        ],
+        products: [
+          {
+            symbol: 'K₂SO₄',
+            acceptedSymbols: ['K2SO4'],
+            word: 'Potassium sulfate',
+            acceptedWords: ['potassium sulfate', 'potassium sulphate'],
+            ionHint: 'Potassium is K⁺ (+1) and sulfate is SO₄²⁻ (-2), so you need two potassium ions: K₂SO₄.'
+          },
+          {
+            symbol: 'H₂O',
+            acceptedSymbols: ['H2O', 'HOH'],
+            word: 'Water',
+            acceptedWords: ['water', 'dihydrogen monoxide'],
+            ionHint: 'H⁺ from sulfuric acid and OH⁻ from potassium hydroxide combine to make water (H₂O).'
+          }
+        ],
+        balancedEquation: 'H₂SO₄ + 2 KOH → K₂SO₄ + 2 H₂O',
+        explanation: 'Acid + Base produces a salt and water. K⁺ (+1) balances SO₄²⁻ (-2) as K₂SO₄, and H⁺ + OH⁻ forms H₂O.'
+      },
+      {
+        id: 'dd_6',
+        type: 'double',
+        reactants: [
+          { symbol: 'CaCl₂', word: 'Calcium chloride' },
+          { symbol: 'Na₂CO₃', word: 'Sodium carbonate' }
+        ],
+        products: [
+          {
+            symbol: 'CaCO₃',
+            acceptedSymbols: ['CaCO3'],
+            word: 'Calcium carbonate',
+            acceptedWords: ['calcium carbonate'],
+            ionHint: 'Ca²⁺ (+2) and CO₃²⁻ (-2) have equal and opposite charges, forming CaCO₃.'
+          },
+          {
+            symbol: 'NaCl',
+            acceptedSymbols: ['NaCl'],
+            word: 'Sodium chloride',
+            acceptedWords: ['sodium chloride'],
+            ionHint: 'Na⁺ (+1) and Cl⁻ (-1) combine in a 1:1 ratio to form NaCl.'
+          }
+        ],
+        balancedEquation: 'CaCl₂ + Na₂CO₃ → CaCO₃(s) + 2 NaCl',
+        explanation: 'Ca²⁺ swaps partners to join CO₃²⁻ (forming solid calcium carbonate, CaCO₃), while Na⁺ pairs with Cl⁻ (forming NaCl).'
+      },
+      {
+        id: 'dd_7',
+        type: 'double',
+        reactants: [
+          { symbol: 'CuSO₄', word: 'Copper(II) sulfate' },
+          { symbol: 'NaOH', word: 'Sodium hydroxide' }
+        ],
+        products: [
+          {
+            symbol: 'Cu(OH)₂',
+            acceptedSymbols: ['Cu(OH)2'],
+            word: 'Copper(II) hydroxide',
+            acceptedWords: ['copper(ii) hydroxide', 'copper (ii) hydroxide'],
+            ionHint: 'Copper(II) is Cu²⁺ and hydroxide is OH⁻, so two hydroxide groups are needed: Cu(OH)₂.'
+          },
+          {
+            symbol: 'Na₂SO₄',
+            acceptedSymbols: ['Na2SO4'],
+            word: 'Sodium sulfate',
+            acceptedWords: ['sodium sulfate', 'sodium sulphate'],
+            ionHint: 'Na⁺ (+1) and SO₄²⁻ (-2) require two sodium ions: Na₂SO₄.'
+          }
+        ],
+        balancedEquation: 'CuSO₄ + 2 NaOH → Cu(OH)₂(s) + Na₂SO₄',
+        explanation: 'Cu²⁺ pairs with two OH⁻ ions to form blue Cu(OH)₂ precipitate, and two Na⁺ ions balance one SO₄²⁻ ion as Na₂SO₄.'
+      },
+      {
+        id: 'dd_8',
+        type: 'double',
+        reactants: [
+          { symbol: 'FeCl₃', word: 'Iron(III) chloride' },
+          { symbol: 'NaOH', word: 'Sodium hydroxide' }
+        ],
+        products: [
+          {
+            symbol: 'Fe(OH)₃',
+            acceptedSymbols: ['Fe(OH)3'],
+            word: 'Iron(III) hydroxide',
+            acceptedWords: ['iron(iii) hydroxide', 'iron (iii) hydroxide'],
+            ionHint: 'Iron(III) has a +3 charge (Fe³⁺) and hydroxide is OH⁻, forming Fe(OH)₃.'
+          },
+          {
+            symbol: 'NaCl',
+            acceptedSymbols: ['NaCl'],
+            word: 'Sodium chloride',
+            acceptedWords: ['sodium chloride'],
+            ionHint: 'Na⁺ (+1) and Cl⁻ (-1) combine in a 1:1 ratio to form NaCl.'
+          }
+        ],
+        balancedEquation: 'FeCl₃ + 3 NaOH → Fe(OH)₃(s) + 3 NaCl',
+        explanation: 'Fe³⁺ swaps partners to bind with three OH⁻ ions, creating rust-colored Fe(OH)₃, while Na⁺ and Cl⁻ form NaCl.'
+      },
+      {
+        id: 'dd_9',
+        type: 'double',
+        reactants: [
+          { symbol: 'HNO₃', word: 'Nitric acid' },
+          { symbol: 'Ca(OH)₂', word: 'Calcium hydroxide' }
+        ],
+        products: [
+          {
+            symbol: 'Ca(NO₃)₂',
+            acceptedSymbols: ['Ca(NO3)2'],
+            word: 'Calcium nitrate',
+            acceptedWords: ['calcium nitrate'],
+            ionHint: 'Calcium is Ca²⁺ (+2) and nitrate is NO₃⁻ (-1), requiring parentheses around nitrate: Ca(NO₃)₂.'
+          },
+          {
+            symbol: 'H₂O',
+            acceptedSymbols: ['H2O', 'HOH'],
+            word: 'Water',
+            acceptedWords: ['water', 'dihydrogen monoxide'],
+            ionHint: 'H⁺ from nitric acid and OH⁻ from calcium hydroxide combine to form water (H₂O).'
+          }
+        ],
+        balancedEquation: '2 HNO₃ + Ca(OH)₂ → Ca(NO₃)₂ + 2 H₂O',
+        explanation: 'Acid-base neutralization between HNO₃ and Ca(OH)₂ forms calcium nitrate salt, Ca(NO₃)₂, and water, H₂O.'
+      },
+      {
+        id: 'dd_10',
+        type: 'double',
+        reactants: [
+          { symbol: 'AgNO₃', word: 'Silver nitrate' },
+          { symbol: 'K₂CrO₄', word: 'Potassium chromate' }
+        ],
+        products: [
+          {
+            symbol: 'Ag₂CrO₄',
+            acceptedSymbols: ['Ag2CrO4'],
+            word: 'Silver chromate',
+            acceptedWords: ['silver chromate', 'silver(i) chromate'],
+            ionHint: 'Silver is Ag⁺ (+1) and chromate is CrO₄²⁻ (-2), requiring two silver ions: Ag₂CrO₄.'
+          },
+          {
+            symbol: 'KNO₃',
+            acceptedSymbols: ['KNO3'],
+            word: 'Potassium nitrate',
+            acceptedWords: ['potassium nitrate'],
+            ionHint: 'K⁺ (+1) and NO₃⁻ (-1) combine in a 1:1 ratio to form KNO₃.'
+          }
+        ],
+        balancedEquation: '2 AgNO₃ + K₂CrO₄ → Ag₂CrO₄(s) + 2 KNO₃',
+        explanation: 'Ag⁺ pairs with CrO₄²⁻ to form a brick-red silver chromate precipitate (Ag₂CrO₄), while K⁺ pairs with NO₃⁻ to form KNO₃.'
+      },
+      {
+        id: 'dd_11',
+        type: 'double',
+        reactants: [
+          { symbol: 'Ca(NO₃)₂', word: 'Calcium nitrate' },
+          { symbol: 'Na₃PO₄', word: 'Sodium phosphate' }
+        ],
+        products: [
+          {
+            symbol: 'Ca₃(PO₄)₂',
+            acceptedSymbols: ['Ca3(PO4)2'],
+            word: 'Calcium phosphate',
+            acceptedWords: ['calcium phosphate'],
+            ionHint: 'Calcium is Ca²⁺ (+2) and phosphate is PO₄³⁻ (-3); criss-crossing charges yields Ca₃(PO₄)₂.'
+          },
+          {
+            symbol: 'NaNO₃',
+            acceptedSymbols: ['NaNO3'],
+            word: 'Sodium nitrate',
+            acceptedWords: ['sodium nitrate'],
+            ionHint: 'Na⁺ (+1) and NO₃⁻ (-1) combine in a 1:1 ratio to form NaNO₃.'
+          }
+        ],
+        balancedEquation: '3 Ca(NO₃)₂ + 2 Na₃PO₄ → Ca₃(PO₄)₂(s) + 6 NaNO₃',
+        explanation: 'Three Ca²⁺ ions (+6) balance two PO₄³⁻ ions (-6) to precipitate calcium phosphate, Ca₃(PO₄)₂, leaving aqueous NaNO₃.'
+      },
+      {
+        id: 'dd_12',
+        type: 'double',
+        reactants: [
+          { symbol: 'ZnSO₄', word: 'Zinc sulfate' },
+          { symbol: 'BaCl₂', word: 'Barium chloride' }
+        ],
+        products: [
+          {
+            symbol: 'ZnCl₂',
+            acceptedSymbols: ['ZnCl2'],
+            word: 'Zinc chloride',
+            acceptedWords: ['zinc chloride', 'zinc(ii) chloride'],
+            ionHint: 'Zinc is Zn²⁺ (+2) and chloride is Cl⁻ (-1), forming ZnCl₂.'
+          },
+          {
+            symbol: 'BaSO₄',
+            acceptedSymbols: ['BaSO4'],
+            word: 'Barium sulfate',
+            acceptedWords: ['barium sulfate', 'barium sulphate'],
+            ionHint: 'Ba²⁺ (+2) and SO₄²⁻ (-2) balance 1:1 to form insoluble BaSO₄.'
+          }
+        ],
+        balancedEquation: 'ZnSO₄ + BaCl₂ → ZnCl₂ + BaSO₄(s)',
+        explanation: 'Zn²⁺ swaps partners to pair with two Cl⁻ ions (ZnCl₂), while Ba²⁺ joins SO₄²⁻ to precipitate barium sulfate (BaSO₄).'
+      },
+      {
+        id: 'dd_13',
+        type: 'double',
+        reactants: [
+          { symbol: 'Pb(NO₃)₂', word: 'Lead(II) nitrate' },
+          { symbol: 'Na₂SO₄', word: 'Sodium sulfate' }
+        ],
+        products: [
+          {
+            symbol: 'PbSO₄',
+            acceptedSymbols: ['PbSO4'],
+            word: 'Lead(II) sulfate',
+            acceptedWords: ['lead(ii) sulfate', 'lead (ii) sulfate', 'lead(ii) sulphate', 'lead (ii) sulphate'],
+            ionHint: 'Lead(II) is Pb²⁺ (+2) and sulfate is SO₄²⁻ (-2), balancing 1:1 to form PbSO₄.'
+          },
+          {
+            symbol: 'NaNO₃',
+            acceptedSymbols: ['NaNO3'],
+            word: 'Sodium nitrate',
+            acceptedWords: ['sodium nitrate'],
+            ionHint: 'Na⁺ (+1) and NO₃⁻ (-1) combine in a 1:1 ratio to form NaNO₃.'
+          }
+        ],
+        balancedEquation: 'Pb(NO₃)₂ + Na₂SO₄ → PbSO₄(s) + 2 NaNO₃',
+        explanation: 'Pb²⁺ combines with SO₄²⁻ to form white lead(II) sulfate precipitate (PbSO₄), while Na⁺ pairs with NO₃⁻ to form NaNO₃.'
+      },
+      {
+        id: 'dd_14',
+        type: 'double',
+        reactants: [
+          { symbol: 'H₃PO₄', word: 'Phosphoric acid' },
+          { symbol: 'NaOH', word: 'Sodium hydroxide' }
+        ],
+        products: [
+          {
+            symbol: 'Na₃PO₄',
+            acceptedSymbols: ['Na3PO4'],
+            word: 'Sodium phosphate',
+            acceptedWords: ['sodium phosphate'],
+            ionHint: 'Sodium is Na⁺ (+1) and phosphate is PO₄³⁻ (-3), requiring three sodium ions: Na₃PO₄.'
+          },
+          {
+            symbol: 'H₂O',
+            acceptedSymbols: ['H2O', 'HOH'],
+            word: 'Water',
+            acceptedWords: ['water', 'dihydrogen monoxide'],
+            ionHint: 'H⁺ and OH⁻ combine to form water (H₂O).'
+          }
+        ],
+        balancedEquation: 'H₃PO₄ + 3 NaOH → Na₃PO₄ + 3 H₂O',
+        explanation: 'Complete neutralization of phosphoric acid (H₃PO₄) with sodium hydroxide (NaOH) yields sodium phosphate (Na₃PO₄) and water (H₂O).'
+      },
+      {
+        id: 'dd_15',
+        type: 'double',
+        reactants: [
+          { symbol: 'MgCl₂', word: 'Magnesium chloride' },
+          { symbol: 'KOH', word: 'Potassium hydroxide' }
+        ],
+        products: [
+          {
+            symbol: 'Mg(OH)₂',
+            acceptedSymbols: ['Mg(OH)2'],
+            word: 'Magnesium hydroxide',
+            acceptedWords: ['magnesium hydroxide'],
+            ionHint: 'Magnesium is Mg²⁺ (+2) and hydroxide is OH⁻ (-1), requiring parentheses: Mg(OH)₂.'
+          },
+          {
+            symbol: 'KCl',
+            acceptedSymbols: ['KCl'],
+            word: 'Potassium chloride',
+            acceptedWords: ['potassium chloride'],
+            ionHint: 'K⁺ (+1) and Cl⁻ (-1) combine in a 1:1 ratio to form KCl.'
+          }
+        ],
+        balancedEquation: 'MgCl₂ + 2 KOH → Mg(OH)₂(s) + 2 KCl',
+        explanation: 'Mg²⁺ pairs with two OH⁻ ions to form insoluble magnesium hydroxide, Mg(OH)₂, while K⁺ and Cl⁻ form KCl.'
+      },
+      {
+        id: 'dd_16',
+        type: 'double',
+        reactants: [
+          { symbol: 'Al₂(SO₄)₃', word: 'Aluminum sulfate' },
+          { symbol: 'BaCl₂', word: 'Barium chloride' }
+        ],
+        products: [
+          {
+            symbol: 'AlCl₃',
+            acceptedSymbols: ['AlCl3'],
+            word: 'Aluminum chloride',
+            acceptedWords: ['aluminum chloride', 'aluminium chloride'],
+            ionHint: 'Aluminum is Al³⁺ (+3) and chloride is Cl⁻ (-1), requiring three chloride ions: AlCl₃.'
+          },
+          {
+            symbol: 'BaSO₄',
+            acceptedSymbols: ['BaSO4'],
+            word: 'Barium sulfate',
+            acceptedWords: ['barium sulfate', 'barium sulphate'],
+            ionHint: 'Ba²⁺ (+2) and SO₄²⁻ (-2) balance 1:1 to form BaSO₄.'
+          }
+        ],
+        balancedEquation: 'Al₂(SO₄)₃ + 3 BaCl₂ → 2 AlCl₃ + 3 BaSO₄(s)',
+        explanation: 'Al³⁺ pairs with three Cl⁻ ions (AlCl₃), while Ba²⁺ joins SO₄²⁻ to precipitate barium sulfate (BaSO₄).'
+      },
+      {
+        id: 'dd_17',
+        type: 'double',
+        reactants: [
+          { symbol: 'CuCl₂', word: 'Copper(II) chloride' },
+          { symbol: 'Na₂S', word: 'Sodium sulfide' }
+        ],
+        products: [
+          {
+            symbol: 'CuS',
+            acceptedSymbols: ['CuS'],
+            word: 'Copper(II) sulfide',
+            acceptedWords: ['copper(ii) sulfide', 'copper (ii) sulfide', 'copper(ii) sulphide', 'copper (ii) sulphide'],
+            ionHint: 'Copper(II) is Cu²⁺ (+2) and sulfide is S²⁻ (-2), combining 1:1 to form CuS.'
+          },
+          {
+            symbol: 'NaCl',
+            acceptedSymbols: ['NaCl'],
+            word: 'Sodium chloride',
+            acceptedWords: ['sodium chloride'],
+            ionHint: 'Na⁺ (+1) and Cl⁻ (-1) combine in a 1:1 ratio to form NaCl.'
+          }
+        ],
+        balancedEquation: 'CuCl₂ + Na₂S → CuS(s) + 2 NaCl',
+        explanation: 'Cu²⁺ combines with S²⁻ to form a black copper(II) sulfide precipitate (CuS), while Na⁺ pairs with Cl⁻ to form NaCl.'
+      },
+      {
+        id: 'dd_18',
+        type: 'double',
+        reactants: [
+          { symbol: 'Fe(NO₃)₃', word: 'Iron(III) nitrate' },
+          { symbol: 'K₃PO₄', word: 'Potassium phosphate' }
+        ],
+        products: [
+          {
+            symbol: 'FePO₄',
+            acceptedSymbols: ['FePO4'],
+            word: 'Iron(III) phosphate',
+            acceptedWords: ['iron(iii) phosphate', 'iron (iii) phosphate'],
+            ionHint: 'Iron(III) is Fe³⁺ (+3) and phosphate is PO₄³⁻ (-3), balancing 1:1 to form FePO₄.'
+          },
+          {
+            symbol: 'KNO₃',
+            acceptedSymbols: ['KNO3'],
+            word: 'Potassium nitrate',
+            acceptedWords: ['potassium nitrate'],
+            ionHint: 'K⁺ (+1) and NO₃⁻ (-1) combine in a 1:1 ratio to form KNO₃.'
+          }
+        ],
+        balancedEquation: 'Fe(NO₃)₃ + K₃PO₄ → FePO₄(s) + 3 KNO₃',
+        explanation: 'Fe³⁺ (+3) and PO₄³⁻ (-3) combine in a 1:1 ratio to precipitate iron(III) phosphate (FePO₄), leaving KNO₃ in solution.'
+      },
+      {
+        id: 'dd_19',
+        type: 'double',
+        reactants: [
+          { symbol: 'NH₄Cl', word: 'Ammonium chloride' },
+          { symbol: 'AgNO₃', word: 'Silver nitrate' }
+        ],
+        products: [
+          {
+            symbol: 'AgCl',
+            acceptedSymbols: ['AgCl'],
+            word: 'Silver chloride',
+            acceptedWords: ['silver chloride', 'silver(i) chloride'],
+            ionHint: 'Ag⁺ (+1) and Cl⁻ (-1) combine 1:1 to form solid AgCl.'
+          },
+          {
+            symbol: 'NH₄NO₃',
+            acceptedSymbols: ['NH4NO3'],
+            word: 'Ammonium nitrate',
+            acceptedWords: ['ammonium nitrate'],
+            ionHint: 'Ammonium (NH₄⁺, +1) and nitrate (NO₃⁻, -1) combine 1:1 to form NH₄NO₃.'
+          }
+        ],
+        balancedEquation: 'NH₄Cl + AgNO₃ → AgCl(s) + NH₄NO₃',
+        explanation: 'The polyatomic cation NH₄⁺ swaps places with Ag⁺, forming white silver chloride precipitate (AgCl) and ammonium nitrate (NH₄NO₃).'
+      },
+      {
+        id: 'dd_20',
+        type: 'double',
+        reactants: [
+          { symbol: 'H₂SO₄', word: 'Sulfuric acid' },
+          { symbol: 'Ba(OH)₂', word: 'Barium hydroxide' }
+        ],
+        products: [
+          {
+            symbol: 'BaSO₄',
+            acceptedSymbols: ['BaSO4'],
+            word: 'Barium sulfate',
+            acceptedWords: ['barium sulfate', 'barium sulphate'],
+            ionHint: 'Ba²⁺ (+2) and SO₄²⁻ (-2) balance 1:1 to form BaSO₄.'
+          },
+          {
+            symbol: 'H₂O',
+            acceptedSymbols: ['H2O', 'HOH'],
+            word: 'Water',
+            acceptedWords: ['water', 'dihydrogen monoxide'],
+            ionHint: 'H⁺ and OH⁻ combine to form water (H₂O).'
+          }
+        ],
+        balancedEquation: 'H₂SO₄ + Ba(OH)₂ → BaSO₄(s) + 2 H₂O',
+        explanation: 'Sulfuric acid and barium hydroxide neutralize each other to form insoluble barium sulfate (BaSO₄) and water (H₂O).'
+      },
+
+      // ==================== SINGLE DISPLACEMENT (20) ====================
+      {
+        id: 'sd_1',
+        type: 'single',
+        reactants: [
+          { symbol: 'Zn', word: 'Zinc' },
+          { symbol: 'HCl', word: 'Hydrochloric acid' }
+        ],
+        products: [
+          {
+            symbol: 'ZnCl₂',
+            acceptedSymbols: ['ZnCl2'],
+            word: 'Zinc chloride',
+            acceptedWords: ['zinc chloride', 'zinc(ii) chloride'],
+            ionHint: 'Zinc always forms a +2 ion (Zn²⁺), so it bonds with two Cl⁻ ions to form ZnCl₂.'
+          },
+          {
+            symbol: 'H₂',
+            acceptedSymbols: ['H2'],
+            word: 'Hydrogen',
+            acceptedWords: ['hydrogen', 'hydrogen gas'],
+            ionHint: 'Displaced hydrogen is a diatomic gas: H₂.'
+          }
+        ],
+        balancedEquation: 'Zn + 2 HCl → ZnCl₂ + H₂(g)',
+        explanation: 'Zinc is more reactive than hydrogen, so it displaces H⁺ from HCl. Zn²⁺ pairs with Cl⁻ to make ZnCl₂, and hydrogen bubbles off as diatomic H₂.'
+      },
+      {
+        id: 'sd_2',
+        type: 'single',
+        reactants: [
+          { symbol: 'Mg', word: 'Magnesium' },
+          { symbol: 'HCl', word: 'Hydrochloric acid' }
+        ],
+        products: [
+          {
+            symbol: 'MgCl₂',
+            acceptedSymbols: ['MgCl2'],
+            word: 'Magnesium chloride',
+            acceptedWords: ['magnesium chloride'],
+            ionHint: 'Magnesium is in Group 2 (Mg²⁺), so it pairs with two Cl⁻ ions to make MgCl₂.'
+          },
+          {
+            symbol: 'H₂',
+            acceptedSymbols: ['H2'],
+            word: 'Hydrogen',
+            acceptedWords: ['hydrogen', 'hydrogen gas'],
+            ionHint: 'Hydrogen is diatomic when alone: H₂.'
+          }
+        ],
+        balancedEquation: 'Mg + 2 HCl → MgCl₂ + H₂(g)',
+        explanation: 'Magnesium replaces hydrogen in hydrochloric acid, producing aqueous magnesium chloride (MgCl₂) and diatomic hydrogen gas (H₂).'
+      },
+      {
+        id: 'sd_3',
+        type: 'single',
+        reactants: [
+          { symbol: 'Fe', word: 'Iron' },
+          { symbol: 'CuSO₄', word: 'Copper(II) sulfate' }
+        ],
+        products: [
+          {
+            symbol: 'FeSO₄',
+            acceptedSymbols: ['FeSO4'],
+            word: 'Iron(II) sulfate',
+            acceptedWords: ['iron(ii) sulfate', 'iron (ii) sulfate', 'iron(ii) sulphate', 'iron (ii) sulphate'],
+            ionHint: 'Iron replaces copper to form Fe²⁺, which pairs 1:1 with SO₄²⁻ as FeSO₄.'
+          },
+          {
+            symbol: 'Cu',
+            acceptedSymbols: ['Cu'],
+            word: 'Copper',
+            acceptedWords: ['copper', 'copper metal'],
+            ionHint: 'Displaced copper precipitates out as pure elemental metal (Cu, not diatomic).'
+          }
+        ],
+        balancedEquation: 'Fe + CuSO₄ → FeSO₄ + Cu',
+        explanation: 'Iron is higher than copper on the activity series, so Fe displaces Cu²⁺ from solution, leaving solid copper metal (Cu) and iron(II) sulfate (FeSO₄).'
+      },
+      {
+        id: 'sd_4',
+        type: 'single',
+        reactants: [
+          { symbol: 'Cu', word: 'Copper' },
+          { symbol: 'AgNO₃', word: 'Silver nitrate' }
+        ],
+        products: [
+          {
+            symbol: 'Cu(NO₃)₂',
+            acceptedSymbols: ['Cu(NO3)2'],
+            word: 'Copper(II) nitrate',
+            acceptedWords: ['copper(ii) nitrate', 'copper (ii) nitrate'],
+            ionHint: 'Copper typically forms Cu²⁺ in solution, requiring two NO₃⁻ ions: Cu(NO₃)₂.'
+          },
+          {
+            symbol: 'Ag',
+            acceptedSymbols: ['Ag'],
+            word: 'Silver',
+            acceptedWords: ['silver', 'silver metal'],
+            ionHint: 'Silver is displaced as pure elemental silver metal (Ag).'
+          }
+        ],
+        balancedEquation: 'Cu + 2 AgNO₃ → Cu(NO₃)₂ + 2 Ag',
+        explanation: 'Copper is more active than silver, displacing Ag⁺ to form sparkling silver crystals (Ag) and blue copper(II) nitrate solution (Cu(NO₃)₂).'
+      },
+      {
+        id: 'sd_5',
+        type: 'single',
+        reactants: [
+          { symbol: 'Al', word: 'Aluminum' },
+          { symbol: 'CuCl₂', word: 'Copper(II) chloride' }
+        ],
+        products: [
+          {
+            symbol: 'AlCl₃',
+            acceptedSymbols: ['AlCl3'],
+            word: 'Aluminum chloride',
+            acceptedWords: ['aluminum chloride', 'aluminium chloride'],
+            ionHint: 'Aluminum forms a +3 ion (Al³⁺), which requires three Cl⁻ ions: AlCl₃.'
+          },
+          {
+            symbol: 'Cu',
+            acceptedSymbols: ['Cu'],
+            word: 'Copper',
+            acceptedWords: ['copper', 'copper metal'],
+            ionHint: 'Copper is displaced as pure elemental copper (Cu).'
+          }
+        ],
+        balancedEquation: '2 Al + 3 CuCl₂ → 2 AlCl₃ + 3 Cu',
+        explanation: 'Aluminum (Al³⁺) is more reactive than copper and replaces it in the chloride compound, yielding AlCl₃ and solid copper (Cu).'
+      },
+      {
+        id: 'sd_6',
+        type: 'single',
+        reactants: [
+          { symbol: 'Na', word: 'Sodium' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'NaOH',
+            acceptedSymbols: ['NaOH'],
+            word: 'Sodium hydroxide',
+            acceptedWords: ['sodium hydroxide'],
+            ionHint: 'Think of water as H–OH: Na⁺ replaces one H⁺ to pair with OH⁻, forming NaOH.'
+          },
+          {
+            symbol: 'H₂',
+            acceptedSymbols: ['H2'],
+            word: 'Hydrogen',
+            acceptedWords: ['hydrogen', 'hydrogen gas'],
+            ionHint: 'The displaced hydrogen forms diatomic gas: H₂.'
+          }
+        ],
+        balancedEquation: '2 Na + 2 H₂O → 2 NaOH + H₂(g)',
+        explanation: 'Active alkali metals like sodium react with water (H–OH) by replacing one hydrogen atom, creating sodium hydroxide (NaOH) and hydrogen gas (H₂).'
+      },
+      {
+        id: 'sd_7',
+        type: 'single',
+        reactants: [
+          { symbol: 'Cl₂', word: 'Chlorine' },
+          { symbol: 'NaBr', word: 'Sodium bromide' }
+        ],
+        products: [
+          {
+            symbol: 'NaCl',
+            acceptedSymbols: ['NaCl'],
+            word: 'Sodium chloride',
+            acceptedWords: ['sodium chloride'],
+            ionHint: 'Chlorine replaces bromine to bond with Na⁺, forming NaCl.'
+          },
+          {
+            symbol: 'Br₂',
+            acceptedSymbols: ['Br2'],
+            word: 'Bromine',
+            acceptedWords: ['bromine', 'liquid bromine'],
+            ionHint: 'Bromine is a diatomic halogen: Br₂.'
+          }
+        ],
+        balancedEquation: 'Cl₂ + 2 NaBr → 2 NaCl + Br₂',
+        explanation: 'In halogen single displacement, a more reactive nonmetal replaces a less reactive anion. Chlorine is above bromine on the periodic table, yielding NaCl and diatomic Br₂.'
+      },
+      {
+        id: 'sd_8',
+        type: 'single',
+        reactants: [
+          { symbol: 'Br₂', word: 'Bromine' },
+          { symbol: 'KI', word: 'Potassium iodide' }
+        ],
+        products: [
+          {
+            symbol: 'KBr',
+            acceptedSymbols: ['KBr'],
+            word: 'Potassium bromide',
+            acceptedWords: ['potassium bromide'],
+            ionHint: 'Bromine replaces iodine to pair 1:1 with K⁺ as KBr.'
+          },
+          {
+            symbol: 'I₂',
+            acceptedSymbols: ['I2'],
+            word: 'Iodine',
+            acceptedWords: ['iodine'],
+            ionHint: 'Iodine is a diatomic halogen: I₂.'
+          }
+        ],
+        balancedEquation: 'Br₂ + 2 KI → 2 KBr + I₂',
+        explanation: 'Bromine is more reactive than iodine, so it displaces the iodide ion (I⁻) to form potassium bromide (KBr) and diatomic iodine (I₂).'
+      },
+      {
+        id: 'sd_9',
+        type: 'single',
+        reactants: [
+          { symbol: 'Zn', word: 'Zinc' },
+          { symbol: 'CuSO₄', word: 'Copper(II) sulfate' }
+        ],
+        products: [
+          {
+            symbol: 'ZnSO₄',
+            acceptedSymbols: ['ZnSO4'],
+            word: 'Zinc sulfate',
+            acceptedWords: ['zinc sulfate', 'zinc sulphate', 'zinc(ii) sulfate', 'zinc(ii) sulphate'],
+            ionHint: 'Zinc forms Zn²⁺ (+2) and pairs 1:1 with sulfate (SO₄²⁻) to form ZnSO₄.'
+          },
+          {
+            symbol: 'Cu',
+            acceptedSymbols: ['Cu'],
+            word: 'Copper',
+            acceptedWords: ['copper', 'copper metal'],
+            ionHint: 'Displaced copper forms pure elemental copper metal (Cu).'
+          }
+        ],
+        balancedEquation: 'Zn + CuSO₄ → ZnSO₄ + Cu',
+        explanation: 'Zinc is more reactive than copper on the activity series, displacing Cu²⁺ from solution to form ZnSO₄ and solid copper (Cu).'
+      },
+      {
+        id: 'sd_10',
+        type: 'single',
+        reactants: [
+          { symbol: 'Mg', word: 'Magnesium' },
+          { symbol: 'AgNO₃', word: 'Silver nitrate' }
+        ],
+        products: [
+          {
+            symbol: 'Mg(NO₃)₂',
+            acceptedSymbols: ['Mg(NO3)2'],
+            word: 'Magnesium nitrate',
+            acceptedWords: ['magnesium nitrate'],
+            ionHint: 'Magnesium is Mg²⁺ (+2) and nitrate is NO₃⁻ (-1), requiring parentheses: Mg(NO₃)₂.'
+          },
+          {
+            symbol: 'Ag',
+            acceptedSymbols: ['Ag'],
+            word: 'Silver',
+            acceptedWords: ['silver', 'silver metal'],
+            ionHint: 'Displaced silver forms pure elemental silver metal (Ag).'
+          }
+        ],
+        balancedEquation: 'Mg + 2 AgNO₃ → Mg(NO₃)₂ + 2 Ag',
+        explanation: 'Magnesium displaces silver ions from silver nitrate solution, yielding magnesium nitrate, Mg(NO₃)₂, and elemental silver (Ag).'
+      },
+      {
+        id: 'sd_11',
+        type: 'single',
+        reactants: [
+          { symbol: 'Al', word: 'Aluminum' },
+          { symbol: 'H₂SO₄', word: 'Sulfuric acid' }
+        ],
+        products: [
+          {
+            symbol: 'Al₂(SO₄)₃',
+            acceptedSymbols: ['Al2(SO4)3'],
+            word: 'Aluminum sulfate',
+            acceptedWords: ['aluminum sulfate', 'aluminium sulfate', 'aluminum sulphate', 'aluminium sulphate'],
+            ionHint: 'Aluminum is Al³⁺ (+3) and sulfate is SO₄²⁻ (-2); criss-crossing charges gives Al₂(SO₄)₃.'
+          },
+          {
+            symbol: 'H₂',
+            acceptedSymbols: ['H2'],
+            word: 'Hydrogen',
+            acceptedWords: ['hydrogen', 'hydrogen gas'],
+            ionHint: 'Displaced hydrogen forms diatomic hydrogen gas (H₂).'
+          }
+        ],
+        balancedEquation: '2 Al + 3 H₂SO₄ → Al₂(SO₄)₃ + 3 H₂(g)',
+        explanation: 'Aluminum displaces hydrogen from sulfuric acid to form aluminum sulfate, Al₂(SO₄)₃, and hydrogen gas (H₂).'
+      },
+      {
+        id: 'sd_12',
+        type: 'single',
+        reactants: [
+          { symbol: 'K', word: 'Potassium' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'KOH',
+            acceptedSymbols: ['KOH'],
+            word: 'Potassium hydroxide',
+            acceptedWords: ['potassium hydroxide'],
+            ionHint: 'Potassium (K⁺) replaces one H⁺ from water (H–OH) to form KOH.'
+          },
+          {
+            symbol: 'H₂',
+            acceptedSymbols: ['H2'],
+            word: 'Hydrogen',
+            acceptedWords: ['hydrogen', 'hydrogen gas'],
+            ionHint: 'Displaced hydrogen forms diatomic gas (H₂).'
+          }
+        ],
+        balancedEquation: '2 K + 2 H₂O → 2 KOH + H₂(g)',
+        explanation: 'Potassium reacts vigorously with water to produce potassium hydroxide (KOH) and diatomic hydrogen gas (H₂).'
+      },
+      {
+        id: 'sd_13',
+        type: 'single',
+        reactants: [
+          { symbol: 'Ca', word: 'Calcium' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'Ca(OH)₂',
+            acceptedSymbols: ['Ca(OH)2'],
+            word: 'Calcium hydroxide',
+            acceptedWords: ['calcium hydroxide'],
+            ionHint: 'Calcium is Ca²⁺ (+2) and hydroxide is OH⁻ (-1), requiring parentheses: Ca(OH)₂.'
+          },
+          {
+            symbol: 'H₂',
+            acceptedSymbols: ['H2'],
+            word: 'Hydrogen',
+            acceptedWords: ['hydrogen', 'hydrogen gas'],
+            ionHint: 'Displaced hydrogen forms diatomic gas (H₂).'
+          }
+        ],
+        balancedEquation: 'Ca + 2 H₂O → Ca(OH)₂ + H₂(g)',
+        explanation: 'Calcium reacts with cold water to form calcium hydroxide, Ca(OH)₂, and bubbles of diatomic hydrogen gas (H₂).'
+      },
+      {
+        id: 'sd_14',
+        type: 'single',
+        reactants: [
+          { symbol: 'Fe', word: 'Iron' },
+          { symbol: 'HCl', word: 'Hydrochloric acid' }
+        ],
+        products: [
+          {
+            symbol: 'FeCl₂',
+            acceptedSymbols: ['FeCl2'],
+            word: 'Iron(II) chloride',
+            acceptedWords: ['iron(ii) chloride', 'iron (ii) chloride'],
+            ionHint: 'Iron reacts with hydrochloric acid to form Iron(II) (Fe²⁺), pairing with two Cl⁻ ions as FeCl₂.'
+          },
+          {
+            symbol: 'H₂',
+            acceptedSymbols: ['H2'],
+            word: 'Hydrogen',
+            acceptedWords: ['hydrogen', 'hydrogen gas'],
+            ionHint: 'Displaced hydrogen is diatomic (H₂).'
+          }
+        ],
+        balancedEquation: 'Fe + 2 HCl → FeCl₂ + H₂(g)',
+        explanation: 'Iron is above hydrogen in the activity series, displacing H⁺ from HCl to form iron(II) chloride (FeCl₂) and hydrogen gas (H₂).'
+      },
+      {
+        id: 'sd_15',
+        type: 'single',
+        reactants: [
+          { symbol: 'Zn', word: 'Zinc' },
+          { symbol: 'Pb(NO₃)₂', word: 'Lead(II) nitrate' }
+        ],
+        products: [
+          {
+            symbol: 'Zn(NO₃)₂',
+            acceptedSymbols: ['Zn(NO3)2'],
+            word: 'Zinc nitrate',
+            acceptedWords: ['zinc nitrate', 'zinc(ii) nitrate'],
+            ionHint: 'Zinc is Zn²⁺ (+2) and nitrate is NO₃⁻ (-1), requiring parentheses: Zn(NO₃)₂.'
+          },
+          {
+            symbol: 'Pb',
+            acceptedSymbols: ['Pb'],
+            word: 'Lead',
+            acceptedWords: ['lead', 'lead metal'],
+            ionHint: 'Lead is displaced as pure elemental lead metal (Pb).'
+          }
+        ],
+        balancedEquation: 'Zn + Pb(NO₃)₂ → Zn(NO₃)₂ + Pb',
+        explanation: 'Zinc is more reactive than lead, displacing Pb²⁺ from solution to form zinc nitrate, Zn(NO₃)₂, and solid lead (Pb).'
+      },
+      {
+        id: 'sd_16',
+        type: 'single',
+        reactants: [
+          { symbol: 'Mg', word: 'Magnesium' },
+          { symbol: 'ZnCl₂', word: 'Zinc chloride' }
+        ],
+        products: [
+          {
+            symbol: 'MgCl₂',
+            acceptedSymbols: ['MgCl2'],
+            word: 'Magnesium chloride',
+            acceptedWords: ['magnesium chloride'],
+            ionHint: 'Magnesium is Mg²⁺ (+2) and chloride is Cl⁻ (-1), forming MgCl₂.'
+          },
+          {
+            symbol: 'Zn',
+            acceptedSymbols: ['Zn'],
+            word: 'Zinc',
+            acceptedWords: ['zinc', 'zinc metal'],
+            ionHint: 'Zinc is displaced as pure elemental zinc metal (Zn).'
+          }
+        ],
+        balancedEquation: 'Mg + ZnCl₂ → MgCl₂ + Zn',
+        explanation: 'Magnesium sits higher than zinc on the activity series, displacing Zn²⁺ to form MgCl₂ and solid zinc (Zn).'
+      },
+      {
+        id: 'sd_17',
+        type: 'single',
+        reactants: [
+          { symbol: 'Cl₂', word: 'Chlorine' },
+          { symbol: 'KI', word: 'Potassium iodide' }
+        ],
+        products: [
+          {
+            symbol: 'KCl',
+            acceptedSymbols: ['KCl'],
+            word: 'Potassium chloride',
+            acceptedWords: ['potassium chloride'],
+            ionHint: 'Chlorine displaces iodine to pair 1:1 with K⁺ as KCl.'
+          },
+          {
+            symbol: 'I₂',
+            acceptedSymbols: ['I2'],
+            word: 'Iodine',
+            acceptedWords: ['iodine'],
+            ionHint: 'Displaced iodine is a diatomic halogen (I₂).'
+          }
+        ],
+        balancedEquation: 'Cl₂ + 2 KI → 2 KCl + I₂',
+        explanation: 'Chlorine is more reactive than iodine, displacing iodide ions from KI to form potassium chloride (KCl) and diatomic iodine (I₂).'
+      },
+      {
+        id: 'sd_18',
+        type: 'single',
+        reactants: [
+          { symbol: 'F₂', word: 'Fluorine' },
+          { symbol: 'NaCl', word: 'Sodium chloride' }
+        ],
+        products: [
+          {
+            symbol: 'NaF',
+            acceptedSymbols: ['NaF'],
+            word: 'Sodium fluoride',
+            acceptedWords: ['sodium fluoride'],
+            ionHint: 'Fluorine displaces chlorine to bond 1:1 with Na⁺ as NaF.'
+          },
+          {
+            symbol: 'Cl₂',
+            acceptedSymbols: ['Cl2'],
+            word: 'Chlorine',
+            acceptedWords: ['chlorine', 'chlorine gas'],
+            ionHint: 'Displaced chlorine is a diatomic gas (Cl₂).'
+          }
+        ],
+        balancedEquation: 'F₂ + 2 NaCl → 2 NaF + Cl₂(g)',
+        explanation: 'Fluorine is the most reactive halogen and displaces chloride ions from NaCl to form sodium fluoride (NaF) and chlorine gas (Cl₂).'
+      },
+      {
+        id: 'sd_19',
+        type: 'single',
+        reactants: [
+          { symbol: 'Al', word: 'Aluminum' },
+          { symbol: 'Fe₂O₃', word: 'Iron(III) oxide' }
+        ],
+        products: [
+          {
+            symbol: 'Al₂O₃',
+            acceptedSymbols: ['Al2O3'],
+            word: 'Aluminum oxide',
+            acceptedWords: ['aluminum oxide', 'aluminium oxide'],
+            ionHint: 'Aluminum is Al³⁺ (+3) and oxide is O²⁻ (-2), forming Al₂O₃.'
+          },
+          {
+            symbol: 'Fe',
+            acceptedSymbols: ['Fe'],
+            word: 'Iron',
+            acceptedWords: ['iron', 'iron metal'],
+            ionHint: 'Iron is displaced as pure elemental iron metal (Fe).'
+          }
+        ],
+        balancedEquation: '2 Al + Fe₂O₃ → Al₂O₃ + 2 Fe',
+        explanation: 'In the thermite reaction, more reactive aluminum displaces iron from iron(III) oxide to form aluminum oxide (Al₂O₃) and molten iron (Fe).'
+      },
+      {
+        id: 'sd_20',
+        type: 'single',
+        reactants: [
+          { symbol: 'Cu', word: 'Copper' },
+          { symbol: 'Hg(NO₃)₂', word: 'Mercury(II) nitrate' }
+        ],
+        products: [
+          {
+            symbol: 'Cu(NO₃)₂',
+            acceptedSymbols: ['Cu(NO3)2'],
+            word: 'Copper(II) nitrate',
+            acceptedWords: ['copper(ii) nitrate', 'copper (ii) nitrate'],
+            ionHint: 'Copper forms Copper(II) (Cu²⁺) and pairs with two nitrate ions: Cu(NO₃)₂.'
+          },
+          {
+            symbol: 'Hg',
+            acceptedSymbols: ['Hg'],
+            word: 'Mercury',
+            acceptedWords: ['mercury', 'liquid mercury', 'mercury metal'],
+            ionHint: 'Mercury is displaced as pure elemental mercury (Hg).'
+          }
+        ],
+        balancedEquation: 'Cu + Hg(NO₃)₂ → Cu(NO₃)₂ + Hg',
+        explanation: 'Copper is more active than mercury on the activity series, displacing Hg²⁺ to form copper(II) nitrate, Cu(NO₃)₂, and liquid mercury (Hg).'
+      },
+
+      // ==================== COMBUSTION (7) ====================
+      {
+        id: 'cb_1',
+        type: 'combustion',
+        reactants: [
+          { symbol: 'CH₄', word: 'Methane' },
+          { symbol: 'O₂', word: 'Oxygen' }
+        ],
+        products: [
+          {
+            symbol: 'CO₂',
+            acceptedSymbols: ['CO2'],
+            word: 'Carbon dioxide',
+            acceptedWords: ['carbon dioxide'],
+            ionHint: 'Carbon from the fuel combines with oxygen to form carbon dioxide (CO₂).'
+          },
+          {
+            symbol: 'H₂O',
+            acceptedSymbols: ['H2O'],
+            word: 'Water',
+            acceptedWords: ['water', 'water vapor', 'steam'],
+            ionHint: 'Hydrogen from the fuel combines with oxygen to form water (H₂O).'
+          }
+        ],
+        balancedEquation: 'CH₄ + 2 O₂ → CO₂ + 2 H₂O',
+        explanation: 'Complete combustion of any hydrocarbon (like methane, CH₄) in oxygen always produces carbon dioxide (CO₂) and water (H₂O).'
+      },
+      {
+        id: 'cb_2',
+        type: 'combustion',
+        reactants: [
+          { symbol: 'C₃H₈', word: 'Propane' },
+          { symbol: 'O₂', word: 'Oxygen' }
+        ],
+        products: [
+          {
+            symbol: 'CO₂',
+            acceptedSymbols: ['CO2'],
+            word: 'Carbon dioxide',
+            acceptedWords: ['carbon dioxide'],
+            ionHint: 'Complete combustion always yields carbon dioxide (CO₂).'
+          },
+          {
+            symbol: 'H₂O',
+            acceptedSymbols: ['H2O'],
+            word: 'Water',
+            acceptedWords: ['water', 'water vapor', 'steam'],
+            ionHint: 'Complete combustion always yields water (H₂O).'
+          }
+        ],
+        balancedEquation: 'C₃H₈ + 5 O₂ → 3 CO₂ + 4 H₂O',
+        explanation: 'Even as the hydrocarbon chain gets longer (propane, C₃H₈), complete combustion with O₂ still yields the exact same two products: CO₂ and H₂O.'
+      },
+      {
+        id: 'cb_3',
+        type: 'combustion',
+        reactants: [
+          { symbol: 'C₂H₆', word: 'Ethane' },
+          { symbol: 'O₂', word: 'Oxygen' }
+        ],
+        products: [
+          {
+            symbol: 'CO₂',
+            acceptedSymbols: ['CO2'],
+            word: 'Carbon dioxide',
+            acceptedWords: ['carbon dioxide'],
+            ionHint: 'Carbon oxidizes completely to carbon dioxide (CO₂).'
+          },
+          {
+            symbol: 'H₂O',
+            acceptedSymbols: ['H2O'],
+            word: 'Water',
+            acceptedWords: ['water', 'water vapor'],
+            ionHint: 'Hydrogen oxidizes to water (H₂O).'
+          }
+        ],
+        balancedEquation: '2 C₂H₆ + 7 O₂ → 4 CO₂ + 6 H₂O',
+        explanation: 'Burning ethane (C₂H₆) completely in oxygen converts all carbon into CO₂ and all hydrogen into H₂O.'
+      },
+      {
+        id: 'cb_4',
+        type: 'combustion',
+        reactants: [
+          { symbol: 'C₄H₁₀', word: 'Butane' },
+          { symbol: 'O₂', word: 'Oxygen' }
+        ],
+        products: [
+          {
+            symbol: 'CO₂',
+            acceptedSymbols: ['CO2'],
+            word: 'Carbon dioxide',
+            acceptedWords: ['carbon dioxide'],
+            ionHint: 'Complete hydrocarbon combustion always forms CO₂.'
+          },
+          {
+            symbol: 'H₂O',
+            acceptedSymbols: ['H2O'],
+            word: 'Water',
+            acceptedWords: ['water', 'water vapor'],
+            ionHint: 'Complete hydrocarbon combustion always forms H₂O.'
+          }
+        ],
+        balancedEquation: '2 C₄H₁₀ + 13 O₂ → 8 CO₂ + 10 H₂O',
+        explanation: 'Butane (lighter fluid, C₄H₁₀) undergoes complete combustion with O₂ to produce carbon dioxide (CO₂) and water (H₂O).'
+      },
+      {
+        id: 'cb_5',
+        type: 'combustion',
+        reactants: [
+          { symbol: 'C₂H₅OH', word: 'Ethanol' },
+          { symbol: 'O₂', word: 'Oxygen' }
+        ],
+        products: [
+          {
+            symbol: 'CO₂',
+            acceptedSymbols: ['CO2'],
+            word: 'Carbon dioxide',
+            acceptedWords: ['carbon dioxide'],
+            ionHint: 'Oxygenated hydrocarbons (alcohols) still produce CO₂ in complete combustion.'
+          },
+          {
+            symbol: 'H₂O',
+            acceptedSymbols: ['H2O'],
+            word: 'Water',
+            acceptedWords: ['water', 'water vapor'],
+            ionHint: 'The second product of alcohol combustion is water (H₂O).'
+          }
+        ],
+        balancedEquation: 'C₂H₅OH + 3 O₂ → 2 CO₂ + 3 H₂O',
+        explanation: 'Compounds containing C, H, and O (like ethanol, C₂H₅OH) burn completely in O₂ to form carbon dioxide (CO₂) and water (H₂O).'
+      },
+      {
+        id: 'cb_6',
+        type: 'combustion',
+        reactants: [
+          { symbol: 'C₆H₁₂O₆', word: 'Glucose' },
+          { symbol: 'O₂', word: 'Oxygen' }
+        ],
+        products: [
+          {
+            symbol: 'CO₂',
+            acceptedSymbols: ['CO2'],
+            word: 'Carbon dioxide',
+            acceptedWords: ['carbon dioxide'],
+            ionHint: 'Glucose oxidizes to produce carbon dioxide (CO₂).'
+          },
+          {
+            symbol: 'H₂O',
+            acceptedSymbols: ['H2O'],
+            word: 'Water',
+            acceptedWords: ['water', 'water vapor'],
+            ionHint: 'Glucose oxidizes to produce water (H₂O).'
+          }
+        ],
+        balancedEquation: 'C₆H₁₂O₆ + 6 O₂ → 6 CO₂ + 6 H₂O',
+        explanation: 'Whether in a flame or cellular respiration, the complete oxidation of glucose (C₆H₁₂O₆) with O₂ produces carbon dioxide (CO₂) and water (H₂O).'
+      },
+      {
+        id: 'cb_7',
+        type: 'combustion',
+        reactants: [
+          { symbol: 'C₈H₁₈', word: 'Octane' },
+          { symbol: 'O₂', word: 'Oxygen' }
+        ],
+        products: [
+          {
+            symbol: 'CO₂',
+            acceptedSymbols: ['CO2'],
+            word: 'Carbon dioxide',
+            acceptedWords: ['carbon dioxide'],
+            ionHint: 'Complete combustion of octane produces carbon dioxide (CO₂).'
+          },
+          {
+            symbol: 'H₂O',
+            acceptedSymbols: ['H2O'],
+            word: 'Water',
+            acceptedWords: ['water', 'water vapor', 'steam'],
+            ionHint: 'Complete combustion of octane produces water (H₂O).'
+          }
+        ],
+        balancedEquation: '2 C₈H₁₈ + 25 O₂ → 16 CO₂ + 18 H₂O',
+        explanation: 'Octane (a primary component of gasoline, C₈H₁₈) undergoes complete combustion in oxygen to yield carbon dioxide (CO₂) and water (H₂O).'
+      },
+
+      // ==================== DECOMPOSITION OF CARBONATES (7) ====================
+      {
+        id: 'dc_1',
+        type: 'decomp_carbonate',
+        reactants: [
+          { symbol: 'CaCO₃', word: 'Calcium carbonate' }
+        ],
+        products: [
+          {
+            symbol: 'CaO',
+            acceptedSymbols: ['CaO'],
+            word: 'Calcium oxide',
+            acceptedWords: ['calcium oxide'],
+            ionHint: 'Calcium is Ca²⁺ (+2) and oxide is O²⁻ (-2), combining 1:1 to form CaO.'
+          },
+          {
+            symbol: 'CO₂',
+            acceptedSymbols: ['CO2'],
+            word: 'Carbon dioxide',
+            acceptedWords: ['carbon dioxide'],
+            ionHint: 'Metal carbonates always release carbon dioxide gas (CO₂) upon thermal decomposition.'
+          }
+        ],
+        balancedEquation: 'CaCO₃ → CaO + CO₂(g)',
+        explanation: 'Heating calcium carbonate (limestone) decomposes it into calcium oxide (CaO) and carbon dioxide gas (CO₂).'
+      },
+      {
+        id: 'dc_2',
+        type: 'decomp_carbonate',
+        reactants: [
+          { symbol: 'MgCO₃', word: 'Magnesium carbonate' }
+        ],
+        products: [
+          {
+            symbol: 'MgO',
+            acceptedSymbols: ['MgO'],
+            word: 'Magnesium oxide',
+            acceptedWords: ['magnesium oxide'],
+            ionHint: 'Magnesium is Mg²⁺ (+2) and oxide is O²⁻ (-2), forming MgO.'
+          },
+          {
+            symbol: 'CO₂',
+            acceptedSymbols: ['CO2'],
+            word: 'Carbon dioxide',
+            acceptedWords: ['carbon dioxide'],
+            ionHint: 'The second decomposition product of any carbonate is carbon dioxide (CO₂).'
+          }
+        ],
+        balancedEquation: 'MgCO₃ → MgO + CO₂(g)',
+        explanation: 'Magnesium carbonate decomposes when heated into magnesium oxide (MgO) and carbon dioxide (CO₂).'
+      },
+      {
+        id: 'dc_3',
+        type: 'decomp_carbonate',
+        reactants: [
+          { symbol: 'Na₂CO₃', word: 'Sodium carbonate' }
+        ],
+        products: [
+          {
+            symbol: 'Na₂O',
+            acceptedSymbols: ['Na2O'],
+            word: 'Sodium oxide',
+            acceptedWords: ['sodium oxide'],
+            ionHint: 'Sodium is Na⁺ (+1) and oxide is O²⁻ (-2), requiring two sodium ions: Na₂O.'
+          },
+          {
+            symbol: 'CO₂',
+            acceptedSymbols: ['CO2'],
+            word: 'Carbon dioxide',
+            acceptedWords: ['carbon dioxide'],
+            ionHint: 'Carbonate decomposition always produces carbon dioxide (CO₂).'
+          }
+        ],
+        balancedEquation: 'Na₂CO₃ → Na₂O + CO₂(g)',
+        explanation: 'Sodium carbonate breaks down at high temperatures into sodium oxide (Na₂O) and carbon dioxide gas (CO₂).'
+      },
+      {
+        id: 'dc_4',
+        type: 'decomp_carbonate',
+        reactants: [
+          { symbol: 'K₂CO₃', word: 'Potassium carbonate' }
+        ],
+        products: [
+          {
+            symbol: 'K₂O',
+            acceptedSymbols: ['K2O'],
+            word: 'Potassium oxide',
+            acceptedWords: ['potassium oxide'],
+            ionHint: 'Potassium is K⁺ (+1) and oxide is O²⁻ (-2), forming K₂O.'
+          },
+          {
+            symbol: 'CO₂',
+            acceptedSymbols: ['CO2'],
+            word: 'Carbon dioxide',
+            acceptedWords: ['carbon dioxide'],
+            ionHint: 'Carbonate decomposition always yields carbon dioxide (CO₂).'
+          }
+        ],
+        balancedEquation: 'K₂CO₃ → K₂O + CO₂(g)',
+        explanation: 'Potassium carbonate decomposes into potassium oxide (K₂O) and carbon dioxide (CO₂).'
+      },
+      {
+        id: 'dc_5',
+        type: 'decomp_carbonate',
+        reactants: [
+          { symbol: 'CuCO₃', word: 'Copper(II) carbonate' }
+        ],
+        products: [
+          {
+            symbol: 'CuO',
+            acceptedSymbols: ['CuO'],
+            word: 'Copper(II) oxide',
+            acceptedWords: ['copper(ii) oxide', 'copper (ii) oxide'],
+            ionHint: 'Copper(II) is Cu²⁺ (+2) and oxide is O²⁻ (-2), forming CuO (Copper(II) oxide).'
+          },
+          {
+            symbol: 'CO₂',
+            acceptedSymbols: ['CO2'],
+            word: 'Carbon dioxide',
+            acceptedWords: ['carbon dioxide'],
+            ionHint: 'The carbonate ion releases carbon dioxide gas (CO₂).'
+          }
+        ],
+        balancedEquation: 'CuCO₃ → CuO + CO₂(g)',
+        explanation: 'Green copper(II) carbonate decomposes upon heating into black copper(II) oxide (CuO) and carbon dioxide (CO₂).'
+      },
+      {
+        id: 'dc_6',
+        type: 'decomp_carbonate',
+        reactants: [
+          { symbol: 'ZnCO₃', word: 'Zinc carbonate' }
+        ],
+        products: [
+          {
+            symbol: 'ZnO',
+            acceptedSymbols: ['ZnO'],
+            word: 'Zinc oxide',
+            acceptedWords: ['zinc oxide', 'zinc(ii) oxide'],
+            ionHint: 'Zinc is Zn²⁺ (+2) and oxide is O²⁻ (-2), forming ZnO.'
+          },
+          {
+            symbol: 'CO₂',
+            acceptedSymbols: ['CO2'],
+            word: 'Carbon dioxide',
+            acceptedWords: ['carbon dioxide'],
+            ionHint: 'Carbonate decomposition produces carbon dioxide (CO₂).'
+          }
+        ],
+        balancedEquation: 'ZnCO₃ → ZnO + CO₂(g)',
+        explanation: 'Zinc carbonate decomposes into zinc oxide (ZnO) and carbon dioxide gas (CO₂).'
+      },
+      {
+        id: 'dc_7',
+        type: 'decomp_carbonate',
+        reactants: [
+          { symbol: 'PbCO₃', word: 'Lead(II) carbonate' }
+        ],
+        products: [
+          {
+            symbol: 'PbO',
+            acceptedSymbols: ['PbO'],
+            word: 'Lead(II) oxide',
+            acceptedWords: ['lead(ii) oxide', 'lead (ii) oxide'],
+            ionHint: 'Lead(II) is Pb²⁺ (+2) and oxide is O²⁻ (-2), forming PbO (Lead(II) oxide).'
+          },
+          {
+            symbol: 'CO₂',
+            acceptedSymbols: ['CO2'],
+            word: 'Carbon dioxide',
+            acceptedWords: ['carbon dioxide'],
+            ionHint: 'Carbonate decomposition releases carbon dioxide gas (CO₂).'
+          }
+        ],
+        balancedEquation: 'PbCO₃ → PbO + CO₂(g)',
+        explanation: 'Lead(II) carbonate decomposes when heated into lead(II) oxide (PbO) and carbon dioxide (CO₂).'
+      },
+
+      // ==================== SYNTHESIS: METAL OXIDE + WATER (7) ====================
+      {
+        id: 'so_1',
+        type: 'synth_oxide_water',
+        reactants: [
+          { symbol: 'CaO', word: 'Calcium oxide' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'Ca(OH)₂',
+            acceptedSymbols: ['Ca(OH)2'],
+            word: 'Calcium hydroxide',
+            acceptedWords: ['calcium hydroxide'],
+            ionHint: 'Calcium is Ca²⁺ (+2) and hydroxide is OH⁻ (-1), requiring two hydroxide groups: Ca(OH)₂.'
+          }
+        ],
+        balancedEquation: 'CaO + H₂O → Ca(OH)₂',
+        explanation: 'Metal oxides react with water in a synthesis reaction to form a metal hydroxide. Ca²⁺ pairs with two OH⁻ ions to form calcium hydroxide, Ca(OH)₂.'
+      },
+      {
+        id: 'so_2',
+        type: 'synth_oxide_water',
+        reactants: [
+          { symbol: 'Na₂O', word: 'Sodium oxide' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'NaOH',
+            acceptedSymbols: ['NaOH'],
+            word: 'Sodium hydroxide',
+            acceptedWords: ['sodium hydroxide'],
+            ionHint: 'Sodium is Na⁺ (+1) and hydroxide is OH⁻ (-1), combining 1:1 to form NaOH.'
+          }
+        ],
+        balancedEquation: 'Na₂O + H₂O → 2 NaOH',
+        explanation: 'Sodium oxide combines with water to form a single base product: sodium hydroxide (NaOH).'
+      },
+      {
+        id: 'so_3',
+        type: 'synth_oxide_water',
+        reactants: [
+          { symbol: 'MgO', word: 'Magnesium oxide' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'Mg(OH)₂',
+            acceptedSymbols: ['Mg(OH)2'],
+            word: 'Magnesium hydroxide',
+            acceptedWords: ['magnesium hydroxide'],
+            ionHint: 'Magnesium is Mg²⁺ (+2) and hydroxide is OH⁻ (-1), forming Mg(OH)₂.'
+          }
+        ],
+        balancedEquation: 'MgO + H₂O → Mg(OH)₂',
+        explanation: 'Magnesium oxide reacts with water to synthesize magnesium hydroxide (Mg(OH)₂, milk of magnesia).'
+      },
+      {
+        id: 'so_4',
+        type: 'synth_oxide_water',
+        reactants: [
+          { symbol: 'K₂O', word: 'Potassium oxide' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'KOH',
+            acceptedSymbols: ['KOH'],
+            word: 'Potassium hydroxide',
+            acceptedWords: ['potassium hydroxide'],
+            ionHint: 'Potassium is K⁺ (+1) and hydroxide is OH⁻ (-1), combining 1:1 to form KOH.'
+          }
+        ],
+        balancedEquation: 'K₂O + H₂O → 2 KOH',
+        explanation: 'Potassium oxide reacts vigorously with water to synthesize potassium hydroxide (KOH).'
+      },
+      {
+        id: 'so_5',
+        type: 'synth_oxide_water',
+        reactants: [
+          { symbol: 'BaO', word: 'Barium oxide' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'Ba(OH)₂',
+            acceptedSymbols: ['Ba(OH)2'],
+            word: 'Barium hydroxide',
+            acceptedWords: ['barium hydroxide'],
+            ionHint: 'Barium is Ba²⁺ (+2) and hydroxide is OH⁻ (-1), forming Ba(OH)₂.'
+          }
+        ],
+        balancedEquation: 'BaO + H₂O → Ba(OH)₂',
+        explanation: 'Barium oxide combines with water in a synthesis reaction to form barium hydroxide, Ba(OH)₂.'
+      },
+      {
+        id: 'so_6',
+        type: 'synth_oxide_water',
+        reactants: [
+          { symbol: 'CuO', word: 'Copper(II) oxide' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'Cu(OH)₂',
+            acceptedSymbols: ['Cu(OH)2'],
+            word: 'Copper(II) hydroxide',
+            acceptedWords: ['copper(ii) hydroxide', 'copper (ii) hydroxide'],
+            ionHint: 'Copper(II) is Cu²⁺ (+2) and hydroxide is OH⁻ (-1), forming Cu(OH)₂ (Copper(II) hydroxide).'
+          }
+        ],
+        balancedEquation: 'CuO + H₂O → Cu(OH)₂',
+        explanation: 'Copper(II) oxide combines with water to form copper(II) hydroxide, Cu(OH)₂.'
+      },
+      {
+        id: 'so_7',
+        type: 'synth_oxide_water',
+        reactants: [
+          { symbol: 'Fe₂O₃', word: 'Iron(III) oxide' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'Fe(OH)₃',
+            acceptedSymbols: ['Fe(OH)3'],
+            word: 'Iron(III) hydroxide',
+            acceptedWords: ['iron(iii) hydroxide', 'iron (iii) hydroxide'],
+            ionHint: 'Iron(III) is Fe³⁺ (+3) and hydroxide is OH⁻ (-1), requiring three hydroxide groups: Fe(OH)₃.'
+          }
+        ],
+        balancedEquation: 'Fe₂O₃ + 3 H₂O → 2 Fe(OH)₃',
+        explanation: 'Iron(III) oxide combines with water to synthesize iron(III) hydroxide, Fe(OH)₃.'
+      },
+
+      // ==================== DECOMPOSITION OF BINARY COMPOUNDS (7) ====================
+      {
+        id: 'db_1',
+        type: 'decomp_binary',
+        reactants: [
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'H₂',
+            acceptedSymbols: ['H2'],
+            word: 'Hydrogen',
+            acceptedWords: ['hydrogen', 'hydrogen gas'],
+            ionHint: 'Hydrogen is one of the 7 diatomic elements, so write H₂.'
+          },
+          {
+            symbol: 'O₂',
+            acceptedSymbols: ['O2'],
+            word: 'Oxygen',
+            acceptedWords: ['oxygen', 'oxygen gas'],
+            ionHint: 'Oxygen is diatomic as a pure element, so write O₂.'
+          }
+        ],
+        balancedEquation: '2 H₂O → 2 H₂(g) + O₂(g)',
+        explanation: 'Electrolysis of water decomposes this binary compound into its two diatomic elements: hydrogen gas (H₂) and oxygen gas (O₂).'
+      },
+      {
+        id: 'db_2',
+        type: 'decomp_binary',
+        reactants: [
+          { symbol: 'NaCl', word: 'Sodium chloride' }
+        ],
+        products: [
+          {
+            symbol: 'Na',
+            acceptedSymbols: ['Na'],
+            word: 'Sodium',
+            acceptedWords: ['sodium', 'sodium metal'],
+            ionHint: 'Sodium is a monatomic metal element (Na).'
+          },
+          {
+            symbol: 'Cl₂',
+            acceptedSymbols: ['Cl2'],
+            word: 'Chlorine',
+            acceptedWords: ['chlorine', 'chlorine gas'],
+            ionHint: 'Chlorine is a diatomic halogen, so write Cl₂.'
+          }
+        ],
+        balancedEquation: '2 NaCl → 2 Na + Cl₂(g)',
+        explanation: 'Molten sodium chloride decomposes into pure sodium metal (Na) and diatomic chlorine gas (Cl₂).'
+      },
+      {
+        id: 'db_3',
+        type: 'decomp_binary',
+        reactants: [
+          { symbol: 'HgO', word: 'Mercury(II) oxide' }
+        ],
+        products: [
+          {
+            symbol: 'Hg',
+            acceptedSymbols: ['Hg'],
+            word: 'Mercury',
+            acceptedWords: ['mercury', 'liquid mercury', 'mercury metal'],
+            ionHint: 'Mercury decomposes into its pure elemental form (Hg).'
+          },
+          {
+            symbol: 'O₂',
+            acceptedSymbols: ['O2'],
+            word: 'Oxygen',
+            acceptedWords: ['oxygen', 'oxygen gas'],
+            ionHint: 'Oxygen is a diatomic gas when uncombined (O₂).'
+          }
+        ],
+        balancedEquation: '2 HgO → 2 Hg + O₂(g)',
+        explanation: 'Heating mercury(II) oxide breaks it down into liquid mercury metal (Hg) and diatomic oxygen gas (O₂).'
+      },
+      {
+        id: 'db_4',
+        type: 'decomp_binary',
+        reactants: [
+          { symbol: 'MgCl₂', word: 'Magnesium chloride' }
+        ],
+        products: [
+          {
+            symbol: 'Mg',
+            acceptedSymbols: ['Mg'],
+            word: 'Magnesium',
+            acceptedWords: ['magnesium', 'magnesium metal'],
+            ionHint: 'Magnesium is a monatomic metal (Mg).'
+          },
+          {
+            symbol: 'Cl₂',
+            acceptedSymbols: ['Cl2'],
+            word: 'Chlorine',
+            acceptedWords: ['chlorine', 'chlorine gas'],
+            ionHint: 'Chlorine is a diatomic element (Cl₂).'
+          }
+        ],
+        balancedEquation: 'MgCl₂ → Mg + Cl₂(g)',
+        explanation: 'Magnesium chloride decomposes into pure magnesium metal (Mg) and diatomic chlorine gas (Cl₂).'
+      },
+      {
+        id: 'db_5',
+        type: 'decomp_binary',
+        reactants: [
+          { symbol: 'Al₂O₃', word: 'Aluminum oxide' }
+        ],
+        products: [
+          {
+            symbol: 'Al',
+            acceptedSymbols: ['Al'],
+            word: 'Aluminum',
+            acceptedWords: ['aluminum', 'aluminium', 'aluminum metal', 'aluminium metal'],
+            ionHint: 'Aluminum is a monatomic metal (Al, not Al₂).'
+          },
+          {
+            symbol: 'O₂',
+            acceptedSymbols: ['O2'],
+            word: 'Oxygen',
+            acceptedWords: ['oxygen', 'oxygen gas'],
+            ionHint: 'Oxygen is diatomic as a free element (O₂, not O₃).'
+          }
+        ],
+        balancedEquation: '2 Al₂O₃ → 4 Al + 3 O₂(g)',
+        explanation: 'Aluminum oxide decomposes into pure aluminum metal (Al) and diatomic oxygen gas (O₂); subscripts in the reactant do not carry over to pure metals.'
+      },
+      {
+        id: 'db_6',
+        type: 'decomp_binary',
+        reactants: [
+          { symbol: 'NH₃', word: 'Ammonia' }
+        ],
+        products: [
+          {
+            symbol: 'N₂',
+            acceptedSymbols: ['N2'],
+            word: 'Nitrogen',
+            acceptedWords: ['nitrogen', 'nitrogen gas'],
+            ionHint: 'Nitrogen is one of the 7 diatomic elements (N₂).'
+          },
+          {
+            symbol: 'H₂',
+            acceptedSymbols: ['H2'],
+            word: 'Hydrogen',
+            acceptedWords: ['hydrogen', 'hydrogen gas'],
+            ionHint: 'Hydrogen is also a diatomic element (H₂).'
+          }
+        ],
+        balancedEquation: '2 NH₃ → N₂(g) + 3 H₂(g)',
+        explanation: 'Ammonia (NH₃) decomposes into its two constituent elements, both of which are diatomic gases: nitrogen (N₂) and hydrogen (H₂).'
+      },
+      {
+        id: 'db_7',
+        type: 'decomp_binary',
+        reactants: [
+          { symbol: 'KBr', word: 'Potassium bromide' }
+        ],
+        products: [
+          {
+            symbol: 'K',
+            acceptedSymbols: ['K'],
+            word: 'Potassium',
+            acceptedWords: ['potassium', 'potassium metal'],
+            ionHint: 'Potassium is a monatomic alkali metal (K).'
+          },
+          {
+            symbol: 'Br₂',
+            acceptedSymbols: ['Br2'],
+            word: 'Bromine',
+            acceptedWords: ['bromine', 'liquid bromine'],
+            ionHint: 'Bromine is a diatomic halogen (Br₂).'
+          }
+        ],
+        balancedEquation: '2 KBr → 2 K + Br₂',
+        explanation: 'Potassium bromide decomposes into pure potassium metal (K) and diatomic bromine (Br₂).'
+      },
+
+      // ==================== SYNTHESIS: BINARY IONIC COMPOUNDS (7) ====================
+      {
+        id: 'sb_1',
+        type: 'synth_binary_ionic',
+        reactants: [
+          { symbol: 'Na', word: 'Sodium' },
+          { symbol: 'Cl₂', word: 'Chlorine' }
+        ],
+        products: [
+          {
+            symbol: 'NaCl',
+            acceptedSymbols: ['NaCl'],
+            word: 'Sodium chloride',
+            acceptedWords: ['sodium chloride'],
+            ionHint: 'Sodium is Na⁺ (+1) and chloride is Cl⁻ (-1), combining 1:1 to form NaCl (the subscript 2 on Cl₂ does not carry over!).'
+          }
+        ],
+        balancedEquation: '2 Na + Cl₂(g) → 2 NaCl',
+        explanation: 'Sodium metal (Na⁺) and chlorine gas (Cl⁻) combine in a synthesis reaction to form ionic sodium chloride (NaCl).'
+      },
+      {
+        id: 'sb_2',
+        type: 'synth_binary_ionic',
+        reactants: [
+          { symbol: 'Mg', word: 'Magnesium' },
+          { symbol: 'O₂', word: 'Oxygen' }
+        ],
+        products: [
+          {
+            symbol: 'MgO',
+            acceptedSymbols: ['MgO'],
+            word: 'Magnesium oxide',
+            acceptedWords: ['magnesium oxide'],
+            ionHint: 'Magnesium is Mg²⁺ (+2) and oxide is O²⁻ (-2), balancing 1:1 to form MgO.'
+          }
+        ],
+        balancedEquation: '2 Mg + O₂(g) → 2 MgO',
+        explanation: 'Magnesium burns in oxygen gas to synthesize white magnesium oxide powder (MgO), where +2 and -2 charges cancel in a 1:1 ratio.'
+      },
+      {
+        id: 'sb_3',
+        type: 'synth_binary_ionic',
+        reactants: [
+          { symbol: 'Al', word: 'Aluminum' },
+          { symbol: 'O₂', word: 'Oxygen' }
+        ],
+        products: [
+          {
+            symbol: 'Al₂O₃',
+            acceptedSymbols: ['Al2O3'],
+            word: 'Aluminum oxide',
+            acceptedWords: ['aluminum oxide', 'aluminium oxide'],
+            ionHint: 'Aluminum is Al³⁺ (+3) and oxide is O²⁻ (-2); criss-crossing charges gives Al₂O₃.'
+          }
+        ],
+        balancedEquation: '4 Al + 3 O₂(g) → 2 Al₂O₃',
+        explanation: 'Aluminum metal reacts with oxygen to synthesize aluminum oxide (Al₂O₃), balancing two Al³⁺ ions (+6) with three O²⁻ ions (-6).'
+      },
+      {
+        id: 'sb_4',
+        type: 'synth_binary_ionic',
+        reactants: [
+          { symbol: 'Ca', word: 'Calcium' },
+          { symbol: 'Br₂', word: 'Bromine' }
+        ],
+        products: [
+          {
+            symbol: 'CaBr₂',
+            acceptedSymbols: ['CaBr2'],
+            word: 'Calcium bromide',
+            acceptedWords: ['calcium bromide'],
+            ionHint: 'Calcium is Ca²⁺ (+2) and bromide is Br⁻ (-1), requiring two bromide ions: CaBr₂.'
+          }
+        ],
+        balancedEquation: 'Ca + Br₂ → CaBr₂',
+        explanation: 'Calcium metal (Ca²⁺) combines with bromine (Br⁻) to form the binary ionic salt calcium bromide (CaBr₂).'
+      },
+      {
+        id: 'sb_5',
+        type: 'synth_binary_ionic',
+        reactants: [
+          { symbol: 'K', word: 'Potassium' },
+          { symbol: 'N₂', word: 'Nitrogen' }
+        ],
+        products: [
+          {
+            symbol: 'K₃N',
+            acceptedSymbols: ['K3N'],
+            word: 'Potassium nitride',
+            acceptedWords: ['potassium nitride'],
+            ionHint: 'Potassium is K⁺ (+1) and nitride is N³⁻ (-3), requiring three potassium ions: K₃N.'
+          }
+        ],
+        balancedEquation: '6 K + N₂(g) → 2 K₃N',
+        explanation: 'Potassium (K⁺) reacts with nitrogen (N³⁻) to form potassium nitride (K₃N).'
+      },
+      {
+        id: 'sb_6',
+        type: 'synth_binary_ionic',
+        reactants: [
+          { symbol: 'Fe', word: 'Iron' },
+          { symbol: 'Cl₂', word: 'Chlorine' }
+        ],
+        products: [
+          {
+            symbol: 'FeCl₃',
+            acceptedSymbols: ['FeCl3'],
+            word: 'Iron(III) chloride',
+            acceptedWords: ['iron(iii) chloride', 'iron (iii) chloride'],
+            ionHint: 'Iron oxidizes to Iron(III) (Fe³⁺) in chlorine gas and pairs with three Cl⁻ ions to form FeCl₃ (Iron(III) chloride).'
+          }
+        ],
+        balancedEquation: '2 Fe + 3 Cl₂(g) → 2 FeCl₃',
+        explanation: 'Iron reacts with excess chlorine gas to synthesize iron(III) chloride (FeCl₃).'
+      },
+      {
+        id: 'sb_7',
+        type: 'synth_binary_ionic',
+        reactants: [
+          { symbol: 'Cu', word: 'Copper' },
+          { symbol: 'O₂', word: 'Oxygen' }
+        ],
+        products: [
+          {
+            symbol: 'CuO',
+            acceptedSymbols: ['CuO'],
+            word: 'Copper(II) oxide',
+            acceptedWords: ['copper(ii) oxide', 'copper (ii) oxide'],
+            ionHint: 'Copper forms Copper(II) (Cu²⁺) and pairs 1:1 with oxide (O²⁻) to form CuO (Copper(II) oxide).'
+          }
+        ],
+        balancedEquation: '2 Cu + O₂(g) → 2 CuO',
+        explanation: 'Heating copper metal in oxygen synthesizes black copper(II) oxide (CuO).'
+      },
+
+      // ==================== SYNTHESIS: NONMETAL OXIDE + WATER (7) ====================
+      {
+        id: 'sno_1',
+        type: 'synth_nonmetal_oxide_water',
+        reactants: [
+          { symbol: 'CO₂', word: 'Carbon dioxide' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'H₂CO₃',
+            acceptedSymbols: ['H2CO3'],
+            word: 'Carbonic acid',
+            acceptedWords: ['carbonic acid'],
+            ionHint: 'Carbon dioxide combines with water to form carbonic acid (H₂CO₃), pairing two H⁺ ions with carbonate (CO₃²⁻).'
+          }
+        ],
+        balancedEquation: 'CO₂ + H₂O → H₂CO₃',
+        explanation: 'Carbon dioxide is an acidic oxide (acid anhydride) that dissolves in water to synthesize carbonic acid (H₂CO₃).'
+      },
+      {
+        id: 'sno_2',
+        type: 'synth_nonmetal_oxide_water',
+        reactants: [
+          { symbol: 'SO₃', word: 'Sulfur trioxide' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'H₂SO₄',
+            acceptedSymbols: ['H2SO4'],
+            word: 'Sulfuric acid',
+            acceptedWords: ['sulfuric acid', 'sulphuric acid'],
+            ionHint: 'Sulfur trioxide (+6 oxidation state) combines with water to form sulfuric acid (H₂SO₄).'
+          }
+        ],
+        balancedEquation: 'SO₃ + H₂O → H₂SO₄',
+        explanation: 'Sulfur trioxide reacts with water in a synthesis reaction to form sulfuric acid (H₂SO₄).'
+      },
+      {
+        id: 'sno_3',
+        type: 'synth_nonmetal_oxide_water',
+        reactants: [
+          { symbol: 'SO₂', word: 'Sulfur dioxide' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'H₂SO₃',
+            acceptedSymbols: ['H2SO3'],
+            word: 'Sulfurous acid',
+            acceptedWords: ['sulfurous acid', 'sulphurous acid'],
+            ionHint: 'Sulfur dioxide (+4 oxidation state) combines with water to form sulfurous acid (H₂SO₃).'
+          }
+        ],
+        balancedEquation: 'SO₂ + H₂O → H₂SO₃',
+        explanation: 'Sulfur dioxide reacts with water to synthesize sulfurous acid (H₂SO₃).'
+      },
+      {
+        id: 'sno_4',
+        type: 'synth_nonmetal_oxide_water',
+        reactants: [
+          { symbol: 'N₂O₅', word: 'Dinitrogen pentoxide' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'HNO₃',
+            acceptedSymbols: ['HNO3'],
+            word: 'Nitric acid',
+            acceptedWords: ['nitric acid'],
+            ionHint: 'Dinitrogen pentoxide (+5 oxidation state) reacts with water to form nitric acid (HNO₃).'
+          }
+        ],
+        balancedEquation: 'N₂O₅ + H₂O → 2 HNO₃',
+        explanation: 'Dinitrogen pentoxide is the acid anhydride of nitric acid; combining it with water synthesizes HNO₃.'
+      },
+      {
+        id: 'sno_5',
+        type: 'synth_nonmetal_oxide_water',
+        reactants: [
+          { symbol: 'N₂O₃', word: 'Dinitrogen trioxide' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'HNO₂',
+            acceptedSymbols: ['HNO2'],
+            word: 'Nitrous acid',
+            acceptedWords: ['nitrous acid'],
+            ionHint: 'Dinitrogen trioxide (+3 oxidation state) reacts with water to form nitrous acid (HNO₂).'
+          }
+        ],
+        balancedEquation: 'N₂O₃ + H₂O → 2 HNO₂',
+        explanation: 'Dinitrogen trioxide combines with water to synthesize nitrous acid (HNO₂).'
+      },
+      {
+        id: 'sno_6',
+        type: 'synth_nonmetal_oxide_water',
+        reactants: [
+          { symbol: 'P₄O₁₀', word: 'Tetraphosphorus decoxide' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'H₃PO₄',
+            acceptedSymbols: ['H3PO4'],
+            word: 'Phosphoric acid',
+            acceptedWords: ['phosphoric acid'],
+            ionHint: 'Phosphorus (+5 oxidation state) pairs with water to form phosphoric acid (H₃PO₄), balancing three H⁺ ions with phosphate (PO₄³⁻).'
+          }
+        ],
+        balancedEquation: 'P₄O₁₀ + 6 H₂O → 4 H₃PO₄',
+        explanation: 'Tetraphosphorus decoxide reacts vigorously with water to synthesize phosphoric acid (H₃PO₄).'
+      },
+      {
+        id: 'sno_7',
+        type: 'synth_nonmetal_oxide_water',
+        reactants: [
+          { symbol: 'Cl₂O₇', word: 'Dichlorine heptoxide' },
+          { symbol: 'H₂O', word: 'Water' }
+        ],
+        products: [
+          {
+            symbol: 'HClO₄',
+            acceptedSymbols: ['HClO4'],
+            word: 'Perchloric acid',
+            acceptedWords: ['perchloric acid'],
+            ionHint: 'Dichlorine heptoxide (+7 oxidation state) reacts with water to form perchloric acid (HClO₄).'
+          }
+        ],
+        balancedEquation: 'Cl₂O₇ + H₂O → 2 HClO₄',
+        explanation: 'Dichlorine heptoxide combines with water to synthesize perchloric acid (HClO₄).'
+      }
+    ];
+
+    // Diatomic formulas list for specific error detection
+    const DIATOMIC_SYMBOLS = ['H2', 'N2', 'O2', 'F2', 'Cl2', 'Br2', 'I2'];
+
+    // Application State
+    const state = {
+      selectedTypes: new Set([
+        'double',
+        'single',
+        'combustion',
+        'decomp_carbonate',
+        'synth_oxide_water',
+        'decomp_binary',
+        'synth_binary_ionic',
+        'synth_nonmetal_oxide_water'
+      ]),
+      deck: [], // Fisher-Yates shuffled queue of remaining reactions in current cycle
+      seenFormats: new Map(), // Tracks which formats ('symbol' | 'word') each reaction ID has been shown in
+      recentTypes: [], // Tracks recent reaction categories to prevent category clustering
+      currentReaction: null,
+      currentFormat: 'symbol', // alternates between 'symbol' and 'word'
+      questionCount: 0,
+      streak: 0,
+      correctCount: 0,
+      totalCount: 0,
+      answeredCurrent: false,
+      lastFocusedInput: null
+    };
+
+    /**
+     * Generates a cryptographically uniform random integer in [0, max).
+     */
+    function getRandomInt(max) {
+      if (max <= 1) return 0;
+      if (window.crypto && window.crypto.getRandomValues) {
+        const array = new Uint32Array(1);
+        const limit = Math.floor(0xffffffff / max) * max;
+        let rand;
+        do {
+          window.crypto.getRandomValues(array);
+          rand = array[0];
+        } while (rand >= limit);
+        return rand % max;
+      }
+      return Math.floor(Math.random() * max);
+    }
+
+    /**
+     * Performs an unbiased in-place Fisher-Yates shuffle on an array.
+     */
+    function fisherYatesShuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = getRandomInt(i + 1);
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    /**
+     * Synchronizes the active shuffle deck when reaction type filters change,
+     * removing deselected types and shuffling newly added types into the remaining deck.
+     */
+    function syncDeckWithSelectedTypes() {
+      // Remove any cards whose category was turned off
+      state.deck = state.deck.filter((rxn) => state.selectedTypes.has(rxn.type));
+
+      // Find any selected categories that are not yet represented in the current deck
+      const typesInDeck = new Set(state.deck.map((rxn) => rxn.type));
+      const newlyEnabledRxns = REACTIONS.filter(
+        (rxn) => state.selectedTypes.has(rxn.type) && !typesInDeck.has(rxn.type)
+      );
+
+      if (newlyEnabledRxns.length > 0) {
+        state.deck = fisherYatesShuffle([...state.deck, ...newlyEnabledRxns]);
+      }
+    }
+
+    // Cached DOM References
+    const el = {
+      statStreak: document.getElementById('stat-streak'),
+      statCorrect: document.getElementById('stat-correct'),
+      statTotal: document.getElementById('stat-total'),
+      btnToggleRef: document.getElementById('btn-toggle-ref'),
+      btnCloseRef: document.getElementById('btn-close-ref'),
+      referencePanel: document.getElementById('reference-panel'),
+      btnSelectAll: document.getElementById('btn-select-all'),
+      reactionFilters: document.getElementById('reaction-filters'),
+      filterNotice: document.getElementById('filter-notice'),
+      badgeReactionType: document.getElementById('badge-reaction-type'),
+      badgePromptFormat: document.getElementById('badge-prompt-format'),
+      formatIcon: document.getElementById('format-icon'),
+      formatLabel: document.getElementById('format-label'),
+      btnSkip: document.getElementById('btn-skip'),
+      instructionTitle: document.getElementById('instruction-title'),
+      instructionSubtitle: document.getElementById('instruction-subtitle'),
+      reactant1: document.getElementById('reactant-1'),
+      reactantPlus: document.getElementById('reactant-plus'),
+      reactant2: document.getElementById('reactant-2'),
+      product1Wrapper: document.getElementById('product-1-wrapper'),
+      inputProduct1: document.getElementById('input-product-1'),
+      statusIcon1: document.getElementById('status-icon-1'),
+      productPlus: document.getElementById('product-plus'),
+      product2Wrapper: document.getElementById('product-2-wrapper'),
+      inputProduct2: document.getElementById('input-product-2'),
+      statusIcon2: document.getElementById('status-icon-2'),
+      subscriptToolbar: document.getElementById('subscript-toolbar'),
+      btnReveal: document.getElementById('btn-reveal'),
+      btnCheck: document.getElementById('btn-check'),
+      btnNext: document.getElementById('btn-next'),
+      feedbackBox: document.getElementById('feedback-box'),
+      feedbackIcon: document.getElementById('feedback-icon'),
+      feedbackTitle: document.getElementById('feedback-title'),
+      feedbackMessage: document.getElementById('feedback-message'),
+      solutionDetails: document.getElementById('solution-details'),
+      balancedEquationText: document.getElementById('balanced-equation-text'),
+      explanationText: document.getElementById('explanation-text')
+    };
+
+    /**
+     * Converts Unicode subscript digits (₀-₉) into standard ASCII digits (0-9).
+     */
+    function unicodeSubscriptsToAscii(str) {
+      const subMap = {
+        '₀': '0',
+        '₁': '1',
+        '₂': '2',
+        '₃': '3',
+        '₄': '4',
+        '₅': '5',
+        '₆': '6',
+        '₇': '7',
+        '₈': '8',
+        '₉': '9'
+      };
+      return str.replace(/[₀-₉]/g, (ch) => subMap[ch] || ch);
+    }
+
+    /**
+     * Normalizes symbolic chemical formulas while strictly preserving letter case.
+     * Strips optional state annotations like (s), (l), (g), (aq) and whitespace.
+     */
+    function normalizeSymbol(raw) {
+      if (!raw) return '';
+      let cleaned = raw.trim();
+      cleaned = cleaned.replace(/\((aq|s|l|g)\)\s*$/i, '');
+      cleaned = cleaned.replace(/\s+/g, '');
+      cleaned = unicodeSubscriptsToAscii(cleaned);
+      return cleaned;
+    }
+
+    /**
+     * Normalizes word chemical names (case-insensitive, normalized whitespace around parentheses).
+     */
+    function normalizeWord(raw) {
+      if (!raw) return '';
+      return raw
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .replace(/\s*\(\s*/g, '(')
+        .replace(/\s*\)\s*/g, ') ');
+    }
+
+    /**
+     * Checks whether a user's single product entry matches a given product definition.
+     */
+    function isProductMatch(userInput, productObj, format) {
+      if (format === 'symbol') {
+        const norm = normalizeSymbol(userInput);
+        return productObj.acceptedSymbols.includes(norm);
+      } else {
+        const norm = normalizeWord(userInput).trim();
+        return productObj.acceptedWords.some((w) => normalizeWord(w).trim() === norm);
+      }
+    }
+
+    /**
+     * Evaluates user inputs against expected products (order-independent for 2-product reactions).
+     */
+    function evaluateAnswers(userInputs, reaction, format) {
+      const expectedProducts = reaction.products;
+      const numExpected = expectedProducts.length;
+
+      if (numExpected === 1) {
+        const isCorrect = isProductMatch(userInputs[0], expectedProducts[0], format);
+        return {
+          allCorrect: isCorrect,
+          matchedCount: isCorrect ? 1 : 0,
+          slotCorrect: [isCorrect],
+          unmatchedProducts: isCorrect ? [] : [expectedProducts[0]]
+        };
+      }
+
+      // 2-product reaction: test both direct order (0->0, 1->1) and swapped order (0->1, 1->0)
+      const direct0 = isProductMatch(userInputs[0], expectedProducts[0], format);
+      const direct1 = isProductMatch(userInputs[1], expectedProducts[1], format);
+
+      const swap0 = isProductMatch(userInputs[0], expectedProducts[1], format);
+      const swap1 = isProductMatch(userInputs[1], expectedProducts[0], format);
+
+      if (direct0 && direct1) {
+        return {
+          allCorrect: true,
+          matchedCount: 2,
+          slotCorrect: [true, true],
+          unmatchedProducts: []
+        };
+      }
+
+      if (swap0 && swap1) {
+        return {
+          allCorrect: true,
+          matchedCount: 2,
+          slotCorrect: [true, true],
+          unmatchedProducts: []
+        };
+      }
+
+      // Partial or zero matches
+      if (direct0 || swap0) {
+        const matchedIdx = direct0 ? 0 : 1;
+        const missingIdx = matchedIdx === 0 ? 1 : 0;
+        return {
+          allCorrect: false,
+          matchedCount: 1,
+          slotCorrect: [true, false],
+          unmatchedProducts: [expectedProducts[missingIdx]]
+        };
+      }
+
+      if (direct1 || swap1) {
+        const matchedIdx = direct1 ? 1 : 0;
+        const missingIdx = matchedIdx === 0 ? 1 : 0;
+        return {
+          allCorrect: false,
+          matchedCount: 1,
+          slotCorrect: [false, true],
+          unmatchedProducts: [expectedProducts[missingIdx]]
+        };
+      }
+
+      return {
+        allCorrect: false,
+        matchedCount: 0,
+        slotCorrect: [false, false],
+        unmatchedProducts: [...expectedProducts]
+      };
+    }
+
+    /**
+     * Generates targeted, educational diagnostic feedback when the student's prediction is incorrect.
+     */
+    function generateDiagnosticFeedback(userInputs, evalResult, rxn, format) {
+      const hints = [];
+      const expectedProducts = rxn.products;
+      const numExpected = expectedProducts.length;
+      const activeInputs = userInputs.slice(0, numExpected);
+
+      // 1. Check for blank fields
+      if (activeInputs.some((val) => !val || !val.trim())) {
+        hints.push(
+          numExpected === 1
+            ? '⚠️ Please enter the predicted product before checking.'
+            : '⚠️ Please enter <strong>both</strong> products before checking your answer.'
+        );
+        return hints;
+      }
+
+      // 2. Check if the student typed the same valid product into both boxes
+      if (numExpected === 2) {
+        const norm0 = format === 'symbol' ? normalizeSymbol(activeInputs[0]) : normalizeWord(activeInputs[0]).trim();
+        const norm1 = format === 'symbol' ? normalizeSymbol(activeInputs[1]) : normalizeWord(activeInputs[1]).trim();
+        if (norm0 && norm0 === norm1) {
+          hints.push('🔁 <strong>Duplicate Entry:</strong> You entered the same product in both boxes. Make sure to predict <strong>two distinct products</strong>.');
+          return hints;
+        }
+      }
+
+      const missingProducts = evalResult.unmatchedProducts;
+
+      // 3. Partial credit acknowledgment if 1 of 2 products is right
+      if (numExpected === 2 && evalResult.matchedCount === 1) {
+        const correctIdx = evalResult.slotCorrect[0] ? 0 : 1;
+        hints.push(`✅ <strong>Halfway there!</strong> Your entry <strong>${activeInputs[correctIdx].trim()}</strong> is correct. Now adjust the other product.`);
+      }
+
+      // 4. Symbol-specific checks (Capitalization, Parentheses, Word-vs-Symbol swap, Diatomic subscripts)
+      if (format === 'symbol') {
+        let capitalizationIssue = false;
+        let missingParentheses = false;
+        let wroteWordsInstead = false;
+        let forgotDiatomic = false;
+
+        activeInputs.forEach((rawInput, idx) => {
+          if (evalResult.slotCorrect[idx]) return;
+          const normSym = normalizeSymbol(rawInput);
+          const normWord = normalizeWord(rawInput).trim();
+
+          // Check if case-insensitive match exists for any expected product
+          const caseInsensitiveMatch = expectedProducts.some((p) =>
+            p.acceptedSymbols.some((acc) => acc.toLowerCase() === normSym.toLowerCase() && acc !== normSym)
+          );
+          if (caseInsensitiveMatch) {
+            capitalizationIssue = true;
+          }
+
+          // Check if required parentheses around a polyatomic ion were omitted (e.g., CuOH2 instead of Cu(OH)2)
+          const parenthesesOmittedMatch = expectedProducts.some((p) =>
+            p.acceptedSymbols.some((acc) => acc.includes('(') && acc.replace(/[()]/g, '') === normSym && acc !== normSym)
+          );
+          if (parenthesesOmittedMatch) {
+            missingParentheses = true;
+          }
+
+          // Check if they typed the English name instead of the chemical formula
+          const wordMatch = expectedProducts.some((p) =>
+            p.acceptedWords.some((w) => normalizeWord(w).trim() === normWord)
+          );
+          if (wordMatch) {
+            wroteWordsInstead = true;
+          }
+
+          // Check if they forgot the subscript 2 on a diatomic element (e.g., H instead of H2)
+          missingProducts.forEach((mp) => {
+            mp.acceptedSymbols.forEach((acc) => {
+              if (DIATOMIC_SYMBOLS.includes(acc) && normSym === acc.replace('2', '')) {
+                forgotDiatomic = true;
+              }
+            });
+          });
+        });
+
+        if (capitalizationIssue) {
+          hints.push('🔤 <strong>Check Capitalization:</strong> Your formula has the right atoms and subscripts, but incorrect capitalization. Always capitalize the first letter of each element symbol and keep any second letter lowercase (e.g., <code>NaCl</code>, <code>CO₂</code>).');
+        }
+        if (missingParentheses) {
+          hints.push('🧩 <strong>Parentheses Required:</strong> Enclose polyatomic ions in parentheses whenever more than one is needed in a formula (for example, write <code>Ca(OH)₂</code> instead of <code>CaOH₂</code>, or <code>Cu(NO₃)₂</code> instead of <code>CuNO₃₂</code>).');
+        }
+        if (wroteWordsInstead) {
+          hints.push('⚗️ <strong>Format Check:</strong> This is a <strong>Symbol Prompt</strong>—enter chemical formulas (such as <code>H₂O</code> or <code>NaCl</code>) rather than chemical names.');
+        }
+        if (forgotDiatomic) {
+          hints.push('⚛️ <strong>Diatomic Element Reminder:</strong> Pure hydrogen, nitrogen, oxygen, and halogens exist as diatomic molecules (<code>H₂, N₂, O₂, F₂, Cl₂, Br₂, I₂</code>) when uncombined.');
+        }
+      } else {
+        // 5. Word-specific checks (Symbol-vs-Word swap, Missing/Wrong Roman Numerals)
+        let wroteSymbolsInstead = false;
+        let missingRomanNumeral = false;
+
+        activeInputs.forEach((rawInput, idx) => {
+          if (evalResult.slotCorrect[idx]) return;
+          const normSym = normalizeSymbol(rawInput);
+          const normWord = normalizeWord(rawInput).trim();
+
+          // Check if they typed the chemical formula in a word prompt
+          const symMatch = expectedProducts.some((p) =>
+            p.acceptedSymbols.some((acc) => acc.toLowerCase() === normSym.toLowerCase())
+          );
+          if (symMatch) {
+            wroteSymbolsInstead = true;
+          }
+
+          // Check if expected product requires a Roman numeral (e.g. "iron(iii) hydroxide") and student omitted "(iii)"
+          missingProducts.forEach((mp) => {
+            const expectedLower = mp.word.toLowerCase();
+            if (/\([iv]+\)/.test(expectedLower)) {
+              const withoutRoman = expectedLower.replace(/\s*\([iv]+\)/g, '').replace(/\s+/g, ' ').trim();
+              const userWithoutRoman = normWord.replace(/\s*\([iv]+\)/g, '').replace(/\s+/g, ' ').trim();
+              if (userWithoutRoman === withoutRoman && normWord !== normalizeWord(mp.word).trim()) {
+                missingRomanNumeral = true;
+              }
+            }
+          });
+        });
+
+        if (wroteSymbolsInstead) {
+          hints.push('📝 <strong>Format Check:</strong> This is a <strong>Word Prompt</strong>—write out the full chemical names (such as <em>Sodium chloride</em> or <em>Water</em>) rather than formulas.');
+        }
+        if (missingRomanNumeral) {
+          hints.push('🏛️ <strong>Roman Numeral Required:</strong> Transition and post-transition metals with variable charges (such as Iron, Copper, and Lead) require a Roman numeral in parentheses to show their charge—for example, <em>Iron(III) hydroxide</em> or <em>Lead(II) iodide</em>.');
+        }
+      }
+
+      // 6. Reaction-type specific conceptual guidance & ion hints
+      if (hints.length === 0 || (hints.length === 1 && evalResult.matchedCount === 1)) {
+        const ionDetails = missingProducts.map((p) => p.ionHint).join(' ');
+        if (rxn.type === 'double') {
+          hints.push(`🔄 <strong>Double Displacement Rule:</strong> Swap the positive cations between the two negative anions and balance charges. ${ionDetails}`);
+        } else if (rxn.type === 'single') {
+          hints.push(`⚡ <strong>Single Displacement Rule:</strong> The single element replaces the like-charged ion in the compound. ${ionDetails}`);
+        } else if (rxn.type === 'combustion') {
+          hints.push('🔥 <strong>Complete Combustion Rule:</strong> Burning a carbon-hydrogen compound in oxygen (<code>O₂</code>) always produces <strong>carbon dioxide (CO₂)</strong> and <strong>water (H₂O)</strong>.');
+        } else if (rxn.type === 'decomp_carbonate') {
+          hints.push(`🧱 <strong>Carbonate Decomposition Rule:</strong> A metal carbonate breaks down into a <strong>metal oxide</strong> and <strong>carbon dioxide (CO₂)</strong>. ${ionDetails}`);
+        } else if (rxn.type === 'synth_oxide_water') {
+          hints.push(`💧 <strong>Synthesis Rule (Metal Oxide + Water):</strong> A metal oxide combines with water to form a single <strong>metal hydroxide</strong>. ${ionDetails}`);
+        } else if (rxn.type === 'decomp_binary') {
+          hints.push(`💥 <strong>Binary Decomposition Rule:</strong> A binary compound splits into its <strong>two pure elements</strong> (apply subscript 2 to diatomic elements). ${ionDetails}`);
+        } else if (rxn.type === 'synth_binary_ionic') {
+          hints.push(`⚛️ <strong>Binary Ionic Synthesis Rule:</strong> A metallic element and a nonmetallic element combine into a single <strong>binary ionic compound</strong> (M + X → MₐXᵦ). Balance cation and anion charges—do not carry over diatomic subscripts! ${ionDetails}`);
+        } else if (rxn.type === 'synth_nonmetal_oxide_water') {
+          hints.push(`🧪 <strong>Synthesis Rule (Nonmetal Oxide + Water):</strong> A nonmetal oxide (acid anhydride) reacts with water to produce a single <strong>oxyacid</strong>. ${ionDetails}`);
+        }
+      }
+
+      return hints;
+    }
+
+    /**
+     * Updates the visual appearance of the reaction type filter buttons.
+     */
+    function updateFilterPillsUI() {
+      const pills = el.reactionFilters.querySelectorAll('.filter-pill');
+      pills.forEach((pill) => {
+        const type = pill.dataset.type;
+        const isActive = state.selectedTypes.has(type);
+        const checkSpan = pill.querySelector('.pill-check');
+
+        pill.setAttribute('aria-pressed', String(isActive));
+        if (isActive) {
+          pill.className = 'filter-pill px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-2 cursor-pointer bg-indigo-600 text-white border-indigo-600 shadow-sm';
+          checkSpan.textContent = '✓';
+        } else {
+          pill.className = 'filter-pill px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-2 cursor-pointer bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100';
+          checkSpan.textContent = '+';
+        }
+      });
+    }
+
+    /**
+     * Updates the scoreboard counters in the top header.
+     */
+    function updateStatsUI() {
+      el.statStreak.textContent = state.streak;
+      el.statCorrect.textContent = state.correctCount;
+      el.statTotal.textContent = state.totalCount;
+    }
+
+    /**
+     * Resets input styling, icons, and feedback panel for a fresh question.
+     */
+    function resetWorkspaceUI() {
+      state.answeredCurrent = false;
+
+      [el.inputProduct1, el.inputProduct2].forEach((input) => {
+        input.value = '';
+        input.disabled = false;
+        input.className = 'product-input w-full px-2.5 sm:px-3.5 py-2.5 sm:py-3 rounded-xl bg-white border-2 border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none text-center font-semibold text-sm sm:text-base text-slate-900 placeholder:text-slate-400 transition';
+      });
+
+      [el.statusIcon1, el.statusIcon2].forEach((icon) => {
+        icon.classList.add('hidden');
+        icon.textContent = '';
+      });
+
+      el.feedbackBox.classList.add('hidden');
+      el.solutionDetails.classList.add('hidden');
+
+      el.btnCheck.classList.remove('hidden');
+      el.btnReveal.classList.remove('hidden');
+      el.btnNext.classList.add('hidden');
+    }
+
+    /**
+     * Renders a given reaction and prompt format ('symbol' or 'word') into the workspace.
+     */
+    function renderReaction(reaction, format) {
+      resetWorkspaceUI();
+
+      const typeConfig = {
+        double: {
+          label: 'Double Displacement',
+          classes: 'bg-purple-100 text-purple-800 border-purple-200'
+        },
+        single: {
+          label: 'Single Displacement',
+          classes: 'bg-amber-100 text-amber-800 border-amber-200'
+        },
+        combustion: {
+          label: 'Combustion',
+          classes: 'bg-rose-100 text-rose-800 border-rose-200'
+        },
+        decomp_carbonate: {
+          label: 'Carbonate Decomposition',
+          classes: 'bg-teal-100 text-teal-800 border-teal-200'
+        },
+        synth_oxide_water: {
+          label: 'Synthesis (Metal Oxide + H₂O)',
+          classes: 'bg-blue-100 text-blue-800 border-blue-200'
+        },
+        decomp_binary: {
+          label: 'Binary Decomposition',
+          classes: 'bg-orange-100 text-orange-800 border-orange-200'
+        },
+        synth_binary_ionic: {
+          label: 'Synthesis (Metal + Nonmetal)',
+          classes: 'bg-emerald-100 text-emerald-800 border-emerald-200'
+        },
+        synth_nonmetal_oxide_water: {
+          label: 'Synthesis (Nonmetal Oxide + H₂O)',
+          classes: 'bg-cyan-100 text-cyan-800 border-cyan-200'
+        }
+      };
+
+      const tCfg = typeConfig[reaction.type] || {
+        label: 'Reaction',
+        classes: 'bg-slate-100 text-slate-800 border-slate-200'
+      };
+      el.badgeReactionType.textContent = tCfg.label;
+      el.badgeReactionType.className = `inline-flex items-center px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase border ${tCfg.classes}`;
+
+      // Configure prompt format badge & subscript toolbar
+      if (format === 'symbol') {
+        el.badgePromptFormat.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 border border-sky-200';
+        el.formatIcon.textContent = '⚗️';
+        el.formatLabel.textContent = 'Symbol Prompt';
+        el.subscriptToolbar.classList.remove('hidden');
+      } else {
+        el.badgePromptFormat.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 border border-violet-200';
+        el.formatIcon.textContent = '📝';
+        el.formatLabel.textContent = 'Word Prompt';
+        el.subscriptToolbar.classList.add('hidden');
+      }
+
+      // Configure 1 vs 2 reactants (randomize display order for 2-reactant equations)
+      if (reaction.reactants.length === 1) {
+        el.reactant1.textContent = format === 'symbol' ? reaction.reactants[0].symbol : reaction.reactants[0].word;
+        el.reactantPlus.classList.add('hidden');
+        el.reactant2.classList.add('hidden');
+      } else {
+        const swapReactants = getRandomInt(2) === 1;
+        const firstReactant = swapReactants ? reaction.reactants[1] : reaction.reactants[0];
+        const secondReactant = swapReactants ? reaction.reactants[0] : reaction.reactants[1];
+
+        el.reactant1.textContent = format === 'symbol' ? firstReactant.symbol : firstReactant.word;
+        el.reactant2.textContent = format === 'symbol' ? secondReactant.symbol : secondReactant.word;
+        el.reactantPlus.classList.remove('hidden');
+        el.reactant2.classList.remove('hidden');
+      }
+
+      // Configure 1 vs 2 products
+      if (reaction.products.length === 1) {
+        el.productPlus.classList.add('hidden');
+        el.product2Wrapper.classList.add('hidden');
+        el.inputProduct1.placeholder = format === 'symbol' ? 'Product formula' : 'Product name';
+        el.instructionTitle.textContent = 'Predict the single product of this synthesis reaction:';
+        el.instructionSubtitle.textContent = format === 'symbol'
+          ? 'Enter the chemical formula for the product.'
+          : 'Enter the full chemical name for the product (include Roman numerals if required).';
+      } else {
+        el.productPlus.classList.remove('hidden');
+        el.product2Wrapper.classList.remove('hidden');
+        el.inputProduct1.placeholder = format === 'symbol' ? 'Product 1 formula' : 'Product 1 name';
+        el.inputProduct2.placeholder = format === 'symbol' ? 'Product 2 formula' : 'Product 2 name';
+        el.instructionTitle.textContent = 'Predict the two products of this reaction:';
+        el.instructionSubtitle.textContent = format === 'symbol'
+          ? 'Enter the chemical formulas for both products (order does not matter).'
+          : 'Enter the full chemical names for both products (order does not matter; include Roman numerals if required).';
+      }
+
+      state.lastFocusedInput = el.inputProduct1;
+      el.inputProduct1.focus();
+    }
+
+    /**
+     * Draws the next randomized reaction from the Fisher-Yates shuffle deck,
+     * applies category rotation smoothing, and alternates between symbol and word prompts.
+     */
+    function loadNextQuestion() {
+      syncDeckWithSelectedTypes();
+
+      // Refill and shuffle deck when exhausted
+      if (state.deck.length === 0) {
+        const pool = REACTIONS.filter((rxn) => state.selectedTypes.has(rxn.type));
+        state.deck = fisherYatesShuffle([...pool]);
+
+        // Prevent immediate back-to-back repeat across deck boundary
+        if (
+          state.deck.length > 1 &&
+          state.currentReaction &&
+          state.deck[state.deck.length - 1].id === state.currentReaction.id
+        ) {
+          const swapIdx = getRandomInt(state.deck.length - 1);
+          const lastIdx = state.deck.length - 1;
+          [state.deck[lastIdx], state.deck[swapIdx]] = [state.deck[swapIdx], state.deck[lastIdx]];
+        }
+      }
+
+      // Smooth category rotation when multiple reaction types are selected
+      if (state.selectedTypes.size > 1 && state.deck.length > 1 && state.recentTypes.length > 0) {
+        const lastType = state.recentTypes[state.recentTypes.length - 1];
+        if (state.deck[state.deck.length - 1].type === lastType) {
+          const candidateIndices = [];
+          for (let i = 0; i < state.deck.length - 1; i++) {
+            if (state.deck[i].type !== lastType) {
+              candidateIndices.push(i);
+            }
+          }
+          if (candidateIndices.length > 0) {
+            const chosenIdx = candidateIndices[getRandomInt(candidateIndices.length)];
+            const lastIdx = state.deck.length - 1;
+            [state.deck[lastIdx], state.deck[chosenIdx]] = [state.deck[chosenIdx], state.deck[lastIdx]];
+          }
+        }
+      }
+
+      const nextReaction = state.deck.pop();
+
+      // Track recent reaction categories
+      state.recentTypes.push(nextReaction.type);
+      if (state.recentTypes.length > 3) {
+        state.recentTypes.shift();
+      }
+
+      // Alternate between symbol and word formats while balancing per-reaction exposure
+      state.questionCount += 1;
+      let nextFormat = state.questionCount % 2 === 1 ? 'symbol' : 'word';
+      const seenSet = state.seenFormats.get(nextReaction.id) || new Set();
+      if (seenSet.size === 1) {
+        nextFormat = seenSet.has('symbol') ? 'word' : 'symbol';
+      }
+      seenSet.add(nextFormat);
+      state.seenFormats.set(nextReaction.id, seenSet);
+
+      state.currentReaction = nextReaction;
+      state.currentFormat = nextFormat;
+
+      renderReaction(nextReaction, nextFormat);
+    }
+
+    /**
+     * Populates and displays the balanced chemical equation and explanation.
+     */
+    function showSolutionDetails() {
+      if (!state.currentReaction) return;
+      el.balancedEquationText.textContent = state.currentReaction.balancedEquation;
+      el.explanationText.textContent = state.currentReaction.explanation;
+      el.solutionDetails.classList.remove('hidden');
+    }
+
+    /**
+     * Checks the student's entered product(s) and displays success or diagnostic feedback.
+     */
+    function handleCheckAnswer() {
+      if (state.answeredCurrent || !state.currentReaction) return;
+
+      const rxn = state.currentReaction;
+      const format = state.currentFormat;
+      const numExpected = rxn.products.length;
+      const userInputs = [el.inputProduct1.value, el.inputProduct2.value];
+      const activeInputs = userInputs.slice(0, numExpected);
+
+      // Check if any required field is empty before counting as a graded attempt
+      if (activeInputs.some((val) => !val || !val.trim())) {
+        el.feedbackBox.className = 'rounded-2xl border border-amber-200 bg-amber-50 text-amber-900 p-4 sm:p-5 animate-fade-in space-y-3';
+        el.feedbackIcon.className = 'w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-base font-bold mt-0.5 bg-amber-200/80 text-amber-900';
+        el.feedbackIcon.textContent = '!';
+        el.feedbackTitle.textContent = 'Incomplete Prediction';
+        el.feedbackMessage.innerHTML = `<p>${
+          numExpected === 1
+            ? 'Please enter your predicted product before checking.'
+            : 'Please enter <strong>both</strong> predicted products before checking your answer.'
+        }</p>`;
+        el.solutionDetails.classList.add('hidden');
+        el.feedbackBox.classList.remove('hidden');
+        return;
+      }
+
+      const evalResult = evaluateAnswers(userInputs, rxn, format);
+
+      if (evalResult.allCorrect) {
+        state.answeredCurrent = true;
+        state.streak += 1;
+        state.correctCount += 1;
+        state.totalCount += 1;
+        updateStatsUI();
+
+        // Mark inputs as correct and lock them
+        const inputEls = [el.inputProduct1, el.inputProduct2];
+        const iconEls = [el.statusIcon1, el.statusIcon2];
+        for (let i = 0; i < numExpected; i++) {
+          inputEls[i].disabled = true;
+          inputEls[i].className = 'product-input w-full px-2.5 sm:px-3.5 py-2.5 sm:py-3 rounded-xl bg-emerald-50/70 border-2 border-emerald-500 text-center font-semibold text-sm sm:text-base text-emerald-950 transition';
+          iconEls[i].textContent = '✓';
+          iconEls[i].className = 'absolute right-2.5 top-1/2 -translate-y-1/2 text-base font-bold text-emerald-600';
+        }
+
+        const altSummary = rxn.products
+          .map((p) => (format === 'symbol' ? `${p.symbol} (${p.word})` : `${p.word} (${p.symbol})`))
+          .join(' + ');
+
+        el.feedbackBox.className = 'rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-950 p-4 sm:p-5 animate-fade-in space-y-3';
+        el.feedbackIcon.className = 'w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-base font-bold mt-0.5 bg-emerald-600 text-white';
+        el.feedbackIcon.textContent = '✓';
+        el.feedbackTitle.textContent = state.streak > 1 ? `Correct! ${state.streak} in a row!` : 'Correct!';
+        el.feedbackMessage.innerHTML = `<p>Great job! Products: <strong>${altSummary}</strong></p>`;
+
+        showSolutionDetails();
+        el.feedbackBox.classList.remove('hidden');
+
+        el.btnCheck.classList.add('hidden');
+        el.btnReveal.classList.add('hidden');
+        el.btnNext.classList.remove('hidden');
+        el.btnNext.focus();
+      } else {
+        state.streak = 0;
+        state.totalCount += 1;
+        updateStatsUI();
+
+        // Highlight individual slots as correct or incorrect
+        const inputEls = [el.inputProduct1, el.inputProduct2];
+        const iconEls = [el.statusIcon1, el.statusIcon2];
+        for (let i = 0; i < numExpected; i++) {
+          if (evalResult.slotCorrect[i]) {
+            inputEls[i].className = 'product-input w-full px-2.5 sm:px-3.5 py-2.5 sm:py-3 rounded-xl bg-emerald-50/60 border-2 border-emerald-500 text-center font-semibold text-sm sm:text-base text-emerald-950 transition';
+            iconEls[i].textContent = '✓';
+            iconEls[i].className = 'absolute right-2.5 top-1/2 -translate-y-1/2 text-base font-bold text-emerald-600';
+          } else {
+            inputEls[i].className = 'product-input w-full px-2.5 sm:px-3.5 py-2.5 sm:py-3 rounded-xl bg-rose-50/60 border-2 border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none text-center font-semibold text-sm sm:text-base text-rose-950 transition';
+            iconEls[i].textContent = '✕';
+            iconEls[i].className = 'absolute right-2.5 top-1/2 -translate-y-1/2 text-base font-bold text-rose-600';
+          }
+        }
+
+        const hints = generateDiagnosticFeedback(userInputs, evalResult, rxn, format);
+        el.feedbackBox.className = 'rounded-2xl border border-rose-200 bg-rose-50 text-rose-950 p-4 sm:p-5 animate-fade-in space-y-3';
+        el.feedbackIcon.className = 'w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-base font-bold mt-0.5 bg-rose-600 text-white';
+        el.feedbackIcon.textContent = '✕';
+        el.feedbackTitle.textContent = 'Not Quite — Check the Feedback Below';
+        el.feedbackMessage.innerHTML = hints.map((h) => `<p>${h}</p>`).join('');
+
+        el.solutionDetails.classList.add('hidden');
+        el.feedbackBox.classList.remove('hidden');
+      }
+    }
+
+    /**
+     * Reveals the correct products, balanced equation, and explanation.
+     */
+    function handleRevealAnswer() {
+      if (state.answeredCurrent || !state.currentReaction) return;
+
+      const rxn = state.currentReaction;
+      const format = state.currentFormat;
+      const numExpected = rxn.products.length;
+
+      state.answeredCurrent = true;
+      state.streak = 0;
+      state.totalCount += 1;
+      updateStatsUI();
+
+      const inputEls = [el.inputProduct1, el.inputProduct2];
+      const iconEls = [el.statusIcon1, el.statusIcon2];
+
+      for (let i = 0; i < numExpected; i++) {
+        const prod = rxn.products[i];
+        inputEls[i].value = format === 'symbol' ? prod.symbol : prod.word;
+        inputEls[i].disabled = true;
+        inputEls[i].className = 'product-input w-full px-2.5 sm:px-3.5 py-2.5 sm:py-3 rounded-xl bg-indigo-50/70 border-2 border-indigo-400 text-center font-semibold text-sm sm:text-base text-indigo-950 transition';
+        iconEls[i].classList.add('hidden');
+      }
+
+      const fullAnswerSummary = rxn.products
+        .map((p) => `${p.symbol} (${p.word})`)
+        .join(' + ');
+
+      el.feedbackBox.className = 'rounded-2xl border border-indigo-200 bg-indigo-50 text-indigo-950 p-4 sm:p-5 animate-fade-in space-y-3';
+      el.feedbackIcon.className = 'w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-base font-bold mt-0.5 bg-indigo-600 text-white';
+      el.feedbackIcon.textContent = 'ℹ';
+      el.feedbackTitle.textContent = 'Solution Revealed';
+      el.feedbackMessage.innerHTML = `<p>Expected product${numExpected > 1 ? 's' : ''}: <strong>${fullAnswerSummary}</strong></p>`;
+
+      showSolutionDetails();
+      el.feedbackBox.classList.remove('hidden');
+
+      el.btnCheck.classList.add('hidden');
+      el.btnReveal.classList.add('hidden');
+      el.btnNext.classList.remove('hidden');
+      el.btnNext.focus();
+    }
+
+    /**
+     * Inserts a subscript character or parenthesis into the active product input.
+     */
+    function insertCharAtCursor(char) {
+      const target = state.lastFocusedInput && !state.lastFocusedInput.disabled
+        ? state.lastFocusedInput
+        : el.inputProduct1;
+
+      if (!target || target.disabled) return;
+
+      const start = target.selectionStart ?? target.value.length;
+      const end = target.selectionEnd ?? target.value.length;
+      const currentVal = target.value;
+
+      target.value = currentVal.slice(0, start) + char + currentVal.slice(end);
+      const nextPos = start + char.length;
+      target.focus();
+      target.setSelectionRange(nextPos, nextPos);
+    }
+
+    // ==================== EVENT LISTENERS ====================
+
+    // Toggle reaction type filter pills
+    el.reactionFilters.addEventListener('click', (event) => {
+      const pill = event.target.closest('.filter-pill');
+      if (!pill) return;
+
+      const type = pill.dataset.type;
+      if (state.selectedTypes.has(type)) {
+        if (state.selectedTypes.size === 1) {
+          el.filterNotice.classList.remove('hidden');
+          return;
+        }
+        state.selectedTypes.delete(type);
+      } else {
+        state.selectedTypes.add(type);
+      }
+
+      el.filterNotice.classList.add('hidden');
+      updateFilterPillsUI();
+
+      // Load a new question if the current reaction's type was deselected
+      if (!state.currentReaction || !state.selectedTypes.has(state.currentReaction.type)) {
+        loadNextQuestion();
+      } else {
+        syncDeckWithSelectedTypes();
+      }
+    });
+
+    // Select All reaction types
+    el.btnSelectAll.addEventListener('click', () => {
+      const pills = el.reactionFilters.querySelectorAll('.filter-pill');
+      pills.forEach((pill) => state.selectedTypes.add(pill.dataset.type));
+      el.filterNotice.classList.add('hidden');
+      updateFilterPillsUI();
+      syncDeckWithSelectedTypes();
+    });
+
+    // Toggle Quick Reference Sheet
+    el.btnToggleRef.addEventListener('click', () => {
+      el.referencePanel.classList.toggle('hidden');
+    });
+
+    el.btnCloseRef.addEventListener('click', () => {
+      el.referencePanel.classList.add('hidden');
+    });
+
+    // Check, Reveal, Next, and Skip buttons
+    el.btnCheck.addEventListener('click', handleCheckAnswer);
+    el.btnReveal.addEventListener('click', handleRevealAnswer);
+    el.btnNext.addEventListener('click', loadNextQuestion);
+    el.btnSkip.addEventListener('click', loadNextQuestion);
+
+    // Track last focused input and handle Enter key submission
+    [el.inputProduct1, el.inputProduct2].forEach((input, idx) => {
+      input.addEventListener('focus', () => {
+        state.lastFocusedInput = input;
+      });
+
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          if (state.answeredCurrent) {
+            loadNextQuestion();
+            return;
+          }
+          // If pressing Enter in Product 1 on a 2-product equation and Product 2 is empty, jump to Product 2
+          if (
+            idx === 0 &&
+            state.currentReaction &&
+            state.currentReaction.products.length === 2 &&
+            !el.inputProduct2.value.trim()
+          ) {
+            el.inputProduct2.focus();
+            return;
+          }
+          handleCheckAnswer();
+        }
+      });
+    });
+
+    // Subscript & parenthesis quick-insert buttons
+    el.subscriptToolbar.addEventListener('click', (event) => {
+      const btn = event.target.closest('.char-btn');
+      if (!btn) return;
+      insertCharAtCursor(btn.dataset.char);
+    });
+
+    // Initialize application
+    updateFilterPillsUI();
+    updateStatsUI();
+    loadNextQuestion();
+  </script>
+</body>
+</html>
